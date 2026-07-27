@@ -7,11 +7,11 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from metakat.common import text_geometry_aligner as alignment
-from metakat.common.text_geometry_aligner import (
+import text_geometry_aligner as alignment
+from text_geometry_aligner import (
     geometry_aligner as geometry_aligner_module,
 )
-from metakat.common.text_geometry_aligner.geometry_matching import (
+from text_geometry_aligner.geometry_matching import (
     overlap as overlap_module,
 )
 
@@ -631,16 +631,16 @@ class RefactorAPITests(unittest.TestCase):
     def test_direction_specific_aligners_replace_old_orchestrator(self) -> None:
         self.assertEqual(
             alignment.TextAligner.__module__,
-            "metakat.common.text_geometry_aligner.text_aligner",
+            "text_geometry_aligner.text_aligner",
         )
         self.assertEqual(
             alignment.GeometryAligner.__module__,
-            "metakat.common.text_geometry_aligner.geometry_aligner",
+            "text_geometry_aligner.geometry_aligner",
         )
         self.assertFalse(hasattr(alignment, "TextGeometryAligner"))
         self.assertFalse(hasattr(alignment, "AlignmentDirection"))
         self.assertIsNone(
             importlib.util.find_spec(
-                "metakat.common.text_geometry_aligner.text_geometry_aligner"
+                "text_geometry_aligner.text_geometry_aligner"
             )
         )

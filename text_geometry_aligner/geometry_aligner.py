@@ -7,37 +7,37 @@ import argparse
 import logging
 from typing import Any, Optional
 
-from metakat.common.text_geometry_aligner.alto_io import ALTOReader
-from metakat.common.text_geometry_aligner.base_aligner import (
+from text_geometry_aligner.alto_io import ALTOReader
+from text_geometry_aligner.base_aligner import (
     BaseAligner,
     add_common_cli_arguments,
     validate_common_cli_arguments,
 )
-from metakat.common.text_geometry_aligner.geometry_matching import (
+from text_geometry_aligner.geometry_matching import (
     GeometryOverlapCalculator,
     GeometryWordAssigner,
     WordAssignmentStrategy,
     create_overlap_calculator,
     create_word_assigner,
 )
-from metakat.common.text_geometry_aligner.json_io import (
+from text_geometry_aligner.json_io import (
     JSONReader,
     JSONWriter,
 )
-from metakat.common.text_geometry_aligner.json_processing import (
+from text_geometry_aligner.json_processing import (
     JSONGeometryExtractor,
     JSONTextMerger,
 )
-from metakat.common.text_geometry_aligner.models import (
+from text_geometry_aligner.models import (
     ALTOPage,
     GeometryAlignmentResult,
 )
-from metakat.common.text_geometry_aligner.rendering import AlignmentRenderer
-from metakat.common.text_geometry_aligner.text_building import (
+from text_geometry_aligner.rendering import AlignmentRenderer
+from text_geometry_aligner.text_building import (
     SpaceSeparatedTextBuilder,
     TextBuilder,
 )
-from metakat.common.text_geometry_aligner.utils import (
+from text_geometry_aligner.utils import (
     _format_json_path,
     _parse_logging_level,
 )

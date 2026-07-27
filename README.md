@@ -19,7 +19,7 @@ Install the dependencies needed by this package from the repository root:
 
 ```bash
 python -m pip install \
-  -r metakat/common/text_geometry_aligner/requirements.txt
+  -r requirements.txt
 ```
 
 The dependency roles are:
@@ -259,7 +259,7 @@ directories are created automatically.
 ### Text alignment CLI
 
 ```bash
-python -m metakat.common.text_geometry_aligner.text_aligner \
+python -m text_geometry_aligner.text_aligner \
   --alto-dir data/alto \
   --json-input-dir data/json \
   --json-output-dir output/json \
@@ -302,7 +302,7 @@ Setting the boundary to `0` applies the CER rule to every query.
 ### Geometry alignment CLI
 
 ```bash
-python -m metakat.common.text_geometry_aligner.geometry_aligner \
+python -m text_geometry_aligner.geometry_aligner \
   --alto-dir data/alto \
   --json-input-dir data/json \
   --json-output-dir output/json \
@@ -345,7 +345,7 @@ paired ALTO XML file.
 The text aligner receives its candidate generator and selector explicitly:
 
 ```python
-from metakat.common.text_geometry_aligner import (
+from text_geometry_aligner import (
     AnchoredFuzzyTextCandidateGenerator,
     CPSATCandidateSelector,
     CompositeCandidateGenerator,
@@ -378,7 +378,7 @@ print(result.matched_count, result.unmatched_count)
 ### Geometry to text
 
 ```python
-from metakat.common.text_geometry_aligner import GeometryAligner
+from text_geometry_aligner import GeometryAligner
 
 aligner = GeometryAligner(
     geometry_suffix="_bbox",

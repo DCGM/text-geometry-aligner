@@ -10,14 +10,14 @@ from dataclasses import replace
 from pathlib import Path
 from unittest import mock
 
-from metakat.common import text_geometry_aligner as alignment
-from metakat.common.text_geometry_aligner import (
+import text_geometry_aligner as alignment
+from text_geometry_aligner import (
     text_aligner as aligner_module,
 )
-from metakat.common.text_geometry_aligner.text_matching.candidate_generators import (
+from text_geometry_aligner.text_matching.candidate_generators import (
     anchored_fuzzy as candidate_generation,
 )
-from metakat.common.text_geometry_aligner.text_matching.candidate_generators import (
+from text_geometry_aligner.text_matching.candidate_generators import (
     ordered_alignment as ordered_candidate_generation,
 )
 
@@ -1497,99 +1497,94 @@ class ArgumentParserTests(unittest.TestCase):
         self.assertEqual(alignment.TextAligner.__name__, "TextAligner")
         self.assertEqual(
             alignment.TextAligner.__module__,
-            "metakat.common.text_geometry_aligner.text_aligner",
-        )
-        self.assertIsNone(
-            importlib.util.find_spec(
-                "metakat.common.engines.engine_text_geometry_alignment"
-            )
+            "text_geometry_aligner.text_aligner",
         )
 
     def test_io_and_processing_apis_have_no_compatibility_aliases(self) -> None:
         self.assertEqual(
             alignment.ALTOReader.__module__,
-            "metakat.common.text_geometry_aligner.alto_io.reader",
+            "text_geometry_aligner.alto_io.reader",
         )
         self.assertEqual(
             alignment.ALTOTextIndex.__module__,
-            "metakat.common.text_geometry_aligner.alto_processing.text_index",
+            "text_geometry_aligner.alto_processing.text_index",
         )
         self.assertEqual(
             alignment.JSONReader.__module__,
-            "metakat.common.text_geometry_aligner.json_io.reader",
+            "text_geometry_aligner.json_io.reader",
         )
         self.assertEqual(
             alignment.JSONWriter.__module__,
-            "metakat.common.text_geometry_aligner.json_io.writer",
+            "text_geometry_aligner.json_io.writer",
         )
         self.assertEqual(
             alignment.JSONTextExtractor.__module__,
-            "metakat.common.text_geometry_aligner.json_processing.text_extractor",
+            "text_geometry_aligner.json_processing.text_extractor",
         )
         self.assertEqual(
             alignment.JSONGeometryMerger.__module__,
-            "metakat.common.text_geometry_aligner.json_processing.geometry_merger",
+            "text_geometry_aligner.json_processing.geometry_merger",
         )
         self.assertFalse(hasattr(alignment, "ALTOParser"))
         self.assertFalse(hasattr(alignment, "JSONValueWriter"))
         self.assertIsNone(
             importlib.util.find_spec(
-                "metakat.common.text_geometry_aligner.alto"
+                "text_geometry_aligner.alto"
             )
         )
         self.assertIsNone(
             importlib.util.find_spec(
-                "metakat.common.text_geometry_aligner.json_io.extractor"
+                "text_geometry_aligner.json_io.extractor"
             )
         )
         self.assertIsNone(
             importlib.util.find_spec(
-                "metakat.common.text_geometry_aligner.json_processing.extractor"
+                "text_geometry_aligner.json_processing.extractor"
             )
         )
         self.assertIsNone(
             importlib.util.find_spec(
-                "metakat.common.text_geometry_aligner.json_processing.merger"
+                "text_geometry_aligner.json_processing.merger"
             )
         )
         self.assertFalse(hasattr(alignment, "JSONValueExtractor"))
         self.assertFalse(hasattr(alignment, "JSONAlignmentMerger"))
         self.assertIsNone(
             importlib.util.find_spec(
-                "metakat.common.text_geometry_aligner.text_matching.candidates"
+                "text_geometry_aligner.text_matching.candidates"
             )
         )
         self.assertIsNone(
             importlib.util.find_spec(
-                "metakat.common.text_geometry_aligner.text_matching.selection"
+                "text_geometry_aligner.text_matching.selection"
             )
         )
         self.assertEqual(
             alignment.GeometryBuilder.__module__,
-            "metakat.common.text_geometry_aligner.geometry_building.base",
+            "text_geometry_aligner.geometry_building.base",
         )
         self.assertEqual(
             alignment.TextBuilder.__module__,
-            "metakat.common.text_geometry_aligner.text_building.base",
+            "text_geometry_aligner.text_building.base",
         )
         self.assertEqual(
             alignment.UnionBoundingBoxGeometryBuilder.__module__,
             (
-                "metakat.common.text_geometry_aligner.geometry_building."
+                "text_geometry_aligner.geometry_building."
                 "union_bounding_box"
             ),
         )
         self.assertEqual(
             alignment.OrthogonalPolygonGeometryBuilder.__module__,
             (
-                "metakat.common.text_geometry_aligner.geometry_building."
+                "text_geometry_aligner.geometry_building."
                 "orthogonal_polygon"
             ),
         )
         self.assertEqual(
             alignment.SpaceSeparatedTextBuilder.__module__,
             (
-                "metakat.common.text_geometry_aligner.text_building."
+                "text_geometry_aligner.text_building."
                 "space_separated"
             ),
         )
@@ -1599,23 +1594,23 @@ class ArgumentParserTests(unittest.TestCase):
         )
         self.assertIsNone(
             importlib.util.find_spec(
-                "metakat.common.text_geometry_aligner.geometry"
+                "text_geometry_aligner.geometry"
             )
         )
         self.assertIsNone(
             importlib.util.find_spec(
-                "metakat.common.text_geometry_aligner.geometry_builder"
+                "text_geometry_aligner.geometry_builder"
             )
         )
         self.assertIsNone(
             importlib.util.find_spec(
-                "metakat.common.text_geometry_aligner.text_builder"
+                "text_geometry_aligner.text_builder"
             )
         )
         self.assertFalse(hasattr(alignment, "create_geometry_builder"))
         self.assertIsNone(
             importlib.util.find_spec(
-                "metakat.common.text_geometry_aligner.matching"
+                "text_geometry_aligner.matching"
             )
         )
         self.assertFalse(hasattr(alignment, "CandidateGenerationStrategy"))

@@ -7,26 +7,26 @@ import argparse
 import logging
 from typing import Any, Optional
 
-from metakat.common.text_geometry_aligner.alto_io import ALTOReader
-from metakat.common.text_geometry_aligner.base_aligner import (
+from text_geometry_aligner.alto_io import ALTOReader
+from text_geometry_aligner.base_aligner import (
     BaseAligner,
     add_common_cli_arguments,
     validate_common_cli_arguments,
 )
-from metakat.common.text_geometry_aligner.geometry_building import (
+from text_geometry_aligner.geometry_building import (
     GeometryBuilder,
     OrthogonalPolygonGeometryBuilder,
     UnionBoundingBoxGeometryBuilder,
 )
-from metakat.common.text_geometry_aligner.json_io import (
+from text_geometry_aligner.json_io import (
     JSONReader,
     JSONWriter,
 )
-from metakat.common.text_geometry_aligner.json_processing import (
+from text_geometry_aligner.json_processing import (
     JSONGeometryMerger,
     JSONTextExtractor,
 )
-from metakat.common.text_geometry_aligner.text_matching.candidate_generators import (
+from text_geometry_aligner.text_matching.candidate_generators import (
     AnchoredFuzzyTextCandidateGenerator,
     CandidateGenerator,
     CompositeCandidateGenerator,
@@ -35,16 +35,16 @@ from metakat.common.text_geometry_aligner.text_matching.candidate_generators imp
     OrderedAlignmentCandidateConfig,
     OrderedAlignmentCandidateGenerator,
 )
-from metakat.common.text_geometry_aligner.text_matching.diagnostics import (
+from text_geometry_aligner.text_matching.diagnostics import (
     _find_ambiguous_value_ids,
     _find_conflicted_value_ids,
 )
-from metakat.common.text_geometry_aligner.text_matching.candidate_selectors import (
+from text_geometry_aligner.text_matching.candidate_selectors import (
     CPSATCandidateSelector,
     CandidateSelector,
     PassThroughCandidateSelector,
 )
-from metakat.common.text_geometry_aligner.models import (
+from text_geometry_aligner.models import (
     ALTOPage,
     CER_SCALE,
     BoundingBox,
@@ -54,17 +54,17 @@ from metakat.common.text_geometry_aligner.models import (
     SelectedAlignment,
     TextAlignmentResult,
 )
-from metakat.common.text_geometry_aligner.normalization import (
+from text_geometry_aligner.normalization import (
     TextNormalizationPipeline,
     TextNormalizer,
 )
-from metakat.common.text_geometry_aligner.preprocessing import (
+from text_geometry_aligner.preprocessing import (
     AlignmentInputNormalizer,
 )
-from metakat.common.text_geometry_aligner.rendering import (
+from text_geometry_aligner.rendering import (
     AlignmentRenderer,
 )
-from metakat.common.text_geometry_aligner.utils import (
+from text_geometry_aligner.utils import (
     _format_json_path,
     _parse_logging_level,
 )
