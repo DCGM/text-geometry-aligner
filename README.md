@@ -280,13 +280,15 @@ Important text-alignment options:
 | `--output-geometry-format` | `bbox` | Build `bbox` or `polygon` output |
 | `--geometry-suffix` | automatic | Defaults to `_bbox` or `_polygon` from the output format |
 | `--output-text-source` | `json` | Preserve JSON text or replace matched values with original `alto` text |
-| `--text-normalizer` | `lowercase` | Repeat to compose lowercase, diacritic stripping, and punctuation stripping; use `none` alone to disable optional stages |
+| `--text-normalizer` | optional | Normalize both JSON and ALTO comparison texts before alignment; repeat to compose lowercase, diacritic stripping, and punctuation stripping |
 | `--preserve-existing-geometry` | off | Skip values already having the selected sibling geometry key |
 
-Unicode NFKC normalization and whitespace collapsing always run. Optional
-normalizers run in the order supplied. The `ordered-alignment` generator
-assumes JSON values are already in correct reading order and is normally paired
-with `--candidate-selector pass-through`.
+Unicode NFKC normalization and whitespace collapsing always run. Each
+`--text-normalizer` optionally adds a transformation to both the JSON and ALTO
+comparison texts before alignment. Repeated arguments stack the transformations
+in the order supplied. The `ordered-alignment` generator assumes JSON values
+are already in correct reading order and is normally paired with
+`--candidate-selector pass-through`.
 
 CP-SAT first maximizes match quality, exact-match count, and matched-value
 count. If complete solutions remain equal, it prefers candidates whose

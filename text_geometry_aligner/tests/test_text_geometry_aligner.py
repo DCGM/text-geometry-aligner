@@ -126,6 +126,12 @@ def _value(value_id: int, text: str) -> alignment.JSONScalarValue:
     )
 
 
+def _lowercase_normalizer() -> alignment.TextNormalizationPipeline:
+    return alignment.TextNormalizationPipeline.from_optional_names(
+        ("lowercase",)
+    )
+
+
 def _combined_generator(
     fuzzy_config: alignment.FuzzyCandidateConfig | None = None,
 ) -> alignment.CompositeCandidateGenerator:
@@ -244,25 +250,15 @@ class FormatIOTests(unittest.TestCase):
 
 
 class NormalizationTests(unittest.TestCase):
-    def test_default_pipeline_preserves_casefold_behavior(self) -> None:
+    def test_default_pipeline_preserves_case(self) -> None:
         pipeline = alignment.TextNormalizationPipeline.from_optional_names()
-        self.assertEqual(pipeline.normalize(" Straße  TEST "), "strasse test")
+        self.assertEqual(pipeline.normalize(" Straße  TEST "), "Straße TEST")
 
     def test_optional_normalizers_are_composable_and_ordered(self) -> None:
         pipeline = alignment.TextNormalizationPipeline.from_optional_names(
             ("lowercase", "strip-diacritics", "strip-punctuation")
         )
         self.assertEqual(pipeline.normalize(" ČESKÝ—Krumlov! "), "cesky krumlov")
-
-    def test_none_disables_optional_normalizers(self) -> None:
-        pipeline = alignment.TextNormalizationPipeline.from_optional_names(("none",))
-        self.assertEqual(pipeline.normalize(" AbC  DEF "), "AbC DEF")
-
-    def test_none_cannot_be_combined(self) -> None:
-        with self.assertRaisesRegex(ValueError, "cannot be combined"):
-            alignment.TextNormalizationPipeline.from_optional_names(
-                ("none", "lowercase")
-            )
 
     def test_preprocessing_does_not_mutate_raw_values_or_alto(self) -> None:
         pipeline = alignment.TextNormalizationPipeline.from_optional_names(
@@ -707,6 +703,7 @@ class ListValueTests(unittest.TestCase):
         aligner = alignment.TextAligner(
             candidate_generator=alignment.ExactTextCandidateGenerator(),
             candidate_selector=_AllCandidateSelector(),
+            normalizer=_lowercase_normalizer(),
             output_text_source=alignment.OutputTextSource.ALTO,
         )
         result = aligner.align_data(
@@ -779,6 +776,7 @@ class ListValueTests(unittest.TestCase):
         aligner = alignment.TextAligner(
             candidate_generator=alignment.ExactTextCandidateGenerator(),
             candidate_selector=_AllCandidateSelector(),
+            normalizer=_lowercase_normalizer(),
         )
         result = aligner.align_data(
             _page("FIRST"),
@@ -795,6 +793,7 @@ class ListValueTests(unittest.TestCase):
             output_geometry_format=alignment.OutputGeometryFormat.POLYGON,
             candidate_generator=alignment.ExactTextCandidateGenerator(),
             candidate_selector=_AllCandidateSelector(),
+            normalizer=_lowercase_normalizer(),
         )
         result = aligner.align_data(
             _page("FIRST", "SECOND"),
@@ -851,6 +850,7 @@ class PolygonOutputTests(unittest.TestCase):
             output_geometry_format=alignment.OutputGeometryFormat.POLYGON,
             candidate_generator=alignment.ExactTextCandidateGenerator(),
             candidate_selector=_AllCandidateSelector(),
+            normalizer=_lowercase_normalizer(),
         )
         return aligner.align_data(
             _page("FIRST", "SECOND"),
@@ -904,6 +904,7 @@ class PolygonOutputTests(unittest.TestCase):
             output_geometry_format=alignment.OutputGeometryFormat.POLYGON,
             candidate_generator=alignment.ExactTextCandidateGenerator(),
             candidate_selector=_AllCandidateSelector(),
+            normalizer=_lowercase_normalizer(),
         )
 
         result = aligner.align_data(
@@ -1353,7 +1354,7 @@ class OrderedAlignmentCandidateTests(unittest.TestCase):
 
 class PassThroughCandidateSelectorTests(unittest.TestCase):
     def test_returns_candidates_unchanged_and_in_the_same_order(self) -> None:
-        normalizer = alignment.TextNormalizationPipeline.from_optional_names()
+        normalizer = _lowercase_normalizer()
         values = (_value(0, "rome"),)
         candidates = alignment.ExactTextCandidateGenerator().generate(
             values,
@@ -1376,7 +1377,7 @@ class CompositeCandidateGeneratorTests(unittest.TestCase):
     def test_earlier_generator_wins_duplicate_span_and_ids_are_reassigned(
         self,
     ) -> None:
-        normalizer = alignment.TextNormalizationPipeline.from_optional_names()
+        normalizer = _lowercase_normalizer()
         index = alignment.ALTOTextIndex(_page("Rome"), normalizer)
         values = (_value(0, "rome"),)
         exact_candidate = alignment.ExactTextCandidateGenerator().generate(
@@ -1421,6 +1422,7 @@ class OutputTextSourceTests(unittest.TestCase):
         aligner = alignment.TextAligner(
             candidate_generator=alignment.ExactTextCandidateGenerator(),
             candidate_selector=_FirstCandidateSelector(),
+            normalizer=_lowercase_normalizer(),
             **kwargs,
         )
         return aligner.align_data(_page("ROME"), {"title": "Rome"})
@@ -1473,7 +1475,7 @@ class CPSATSelectionTests(unittest.TestCase):
             values,
             alignment.ALTOTextIndex(
                 _page("Rome", "other", "Rome"),
-                alignment.TextNormalizationPipeline.from_optional_names(),
+                _lowercase_normalizer(),
             ),
         )
         earlier, later = generated
@@ -1492,7 +1494,7 @@ class CPSATSelectionTests(unittest.TestCase):
         self.assertEqual(selected[0].candidate_id, 1)
 
     def test_long_near_exact_phrase_beats_short_exact_substring(self) -> None:
-        normalizer = alignment.TextNormalizationPipeline.from_optional_names()
+        normalizer = _lowercase_normalizer()
         preprocessor = alignment.AlignmentInputNormalizer(normalizer)
         values = preprocessor.normalize_values(
             (
@@ -1692,10 +1694,20 @@ class ArgumentParserTests(unittest.TestCase):
                 "pass-through",
             ]
         )
+        stacked_normalizer_args = parser.parse_args(
+            [
+                *required_arguments,
+                "--text-normalizer",
+                "strip-diacritics",
+                "--text-normalizer",
+                "lowercase",
+            ]
+        )
         self.assertEqual(default_args.output_text_source, "json")
         self.assertEqual(default_args.output_geometry_format, "bbox")
         self.assertEqual(default_args.candidate_generator, "combined")
         self.assertEqual(default_args.candidate_selector, "cp-sat")
+        self.assertIsNone(default_args.text_normalizer)
         self.assertIsNone(default_args.geometry_suffix)
         self.assertEqual(alto_args.output_text_source, "alto")
         self.assertEqual(polygon_args.output_geometry_format, "polygon")
@@ -1705,6 +1717,10 @@ class ArgumentParserTests(unittest.TestCase):
             "ordered-alignment",
         )
         self.assertEqual(ordered_args.candidate_selector, "pass-through")
+        self.assertEqual(
+            stacked_normalizer_args.text_normalizer,
+            ["strip-diacritics", "lowercase"],
+        )
 
         with (
             self.assertRaises(SystemExit),

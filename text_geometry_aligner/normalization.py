@@ -86,16 +86,10 @@ class TextNormalizationPipeline(TextNormalizer):
         """Build the standard pipeline.
 
         Unicode normalization and final whitespace collapsing are mandatory.
-        Omitting ``optional_names`` preserves the historical lowercase default;
-        passing ``("none",)`` explicitly disables all optional stages.
+        Omitting ``optional_names`` disables all optional stages.
         """
 
-        names = ("lowercase",) if optional_names is None else tuple(optional_names)
-        if "none" in names:
-            if names != ("none",):
-                raise ValueError("'none' cannot be combined with other text normalizers")
-            names = ()
-
+        names = () if optional_names is None else tuple(optional_names)
         unknown = [name for name in names if name not in cls.OPTIONAL_NORMALIZERS]
         if unknown:
             raise ValueError(f"Unknown text normalizers: {unknown}")

@@ -284,13 +284,12 @@ def build_argument_parser() -> argparse.ArgumentParser:
             "lowercase",
             "strip-diacritics",
             "strip-punctuation",
-            "none",
         ),
         default=None,
         help=(
-            "Optional comparison-text normalizer. Repeat to build an ordered "
-            "pipeline. When omitted, lowercase is enabled for compatibility. "
-            "Use 'none' alone to disable all optional normalizers."
+            "Optional normalization applied to both JSON and ALTO comparison "
+            "texts before alignment. Repeat to apply multiple normalizers in "
+            "the order supplied."
         ),
     )
     parser.add_argument(
