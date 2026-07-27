@@ -1,0 +1,4 @@
+Levenshtein
+ortools~=9.14.6206
+Pillow~=10.0.1
+Shapely~=2.1.2
