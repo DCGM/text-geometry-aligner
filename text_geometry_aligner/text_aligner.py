@@ -100,7 +100,7 @@ class TextAligner(BaseAligner[TextAlignmentResult]):
         json_writer: Optional[JSONWriter] = None,
         geometry_builder: Optional[GeometryBuilder] = None,
         renderer: Optional[AlignmentRenderer] = None,
-        preserve_existing_geometry: bool = False,
+        overwrite_existing_geometry: bool = False,
         output_text_source: OutputTextSource | str = OutputTextSource.JSON,
     ):
         if geometry_suffix == "":
@@ -125,15 +125,15 @@ class TextAligner(BaseAligner[TextAlignmentResult]):
         self.geometry_builder = geometry_builder or _build_geometry_builder(
             self.output_geometry_format
         )
-        self.preserve_existing_geometry = preserve_existing_geometry
+        self.overwrite_existing_geometry = overwrite_existing_geometry
         self.output_text_source = OutputTextSource(output_text_source)
         self.text_extractor = JSONTextExtractor(
             geometry_suffix=self.geometry_suffix,
-            preserve_existing_geometry=self.preserve_existing_geometry,
+            overwrite_existing_geometry=self.overwrite_existing_geometry,
         )
         self.geometry_merger = JSONGeometryMerger(
             geometry_suffix=self.geometry_suffix,
-            preserve_existing_geometry=self.preserve_existing_geometry,
+            overwrite_existing_geometry=self.overwrite_existing_geometry,
         )
 
     def align_data(
@@ -351,9 +351,12 @@ def build_argument_parser() -> argparse.ArgumentParser:
         help="Optional CP-SAT time limit; omitted means no explicit limit",
     )
     parser.add_argument(
-        "--preserve-existing-geometry",
+        "--overwrite-existing-geometry",
         action="store_true",
-        help="Do not realign fields that already have a sibling geometry key",
+        help=(
+            "Process and replace geometry destinations that already exist; "
+            "by default their text values are skipped before matching"
+        ),
     )
     parser.add_argument(
         "--logging-level",
@@ -439,7 +442,7 @@ def main() -> None:
             args.output_geometry_format
         ),
         normalizer=normalizer,
-        preserve_existing_geometry=args.preserve_existing_geometry,
+        overwrite_existing_geometry=args.overwrite_existing_geometry,
         output_text_source=OutputTextSource(args.output_text_source),
     )
     aligner.process_directories(

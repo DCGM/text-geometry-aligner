@@ -882,7 +882,8 @@ class PolygonOutputTests(unittest.TestCase):
 
     def test_extractor_ignores_geometry_from_both_formats(self) -> None:
         values = alignment.JSONTextExtractor(
-            geometry_suffix="_polygon"
+            geometry_suffix="_polygon",
+            overwrite_existing_geometry=True,
         ).extract(
             {
                 "title": "Rome",
@@ -915,11 +916,10 @@ class PolygonOutputTests(unittest.TestCase):
         self.assertEqual(result.output_data["title_bbox"], existing_bbox)
         self.assertIn("title_polygon", result.output_data)
 
-    def test_preserve_existing_geometry_applies_to_selected_format(self) -> None:
+    def test_existing_geometry_is_preserved_by_default(self) -> None:
         existing_polygon = [[1, 2], [4, 2], [1, 2]]
         aligner = alignment.TextAligner(
             output_geometry_format=alignment.OutputGeometryFormat.POLYGON,
-            preserve_existing_geometry=True,
             candidate_generator=alignment.ExactTextCandidateGenerator(),
             candidate_selector=_AllCandidateSelector(),
         )
@@ -934,6 +934,28 @@ class PolygonOutputTests(unittest.TestCase):
             existing_polygon,
         )
         self.assertEqual(result.matched_count, 0)
+
+    def test_overwrite_existing_geometry_realigns_selected_format(self) -> None:
+        aligner = alignment.TextAligner(
+            output_geometry_format=alignment.OutputGeometryFormat.POLYGON,
+            overwrite_existing_geometry=True,
+            candidate_generator=alignment.ExactTextCandidateGenerator(),
+            candidate_selector=_AllCandidateSelector(),
+        )
+
+        result = aligner.align_data(
+            _page("Rome"),
+            {
+                "title": "Rome",
+                "title_polygon": [[1, 2], [4, 2], [1, 2]],
+            },
+        )
+
+        self.assertEqual(
+            result.output_data["title_polygon"],
+            [[0, 0], [9, 0], [9, 10], [0, 10], [0, 0]],
+        )
+        self.assertEqual(result.matched_count, 1)
 
 
 class PolygonRenderingTests(unittest.TestCase):
@@ -1660,6 +1682,7 @@ class ArgumentParserTests(unittest.TestCase):
         self.assertIn("--output-geometry-format", option_strings)
         self.assertIn("--candidate-generator", option_strings)
         self.assertIn("--candidate-selector", option_strings)
+        self.assertIn("--overwrite-existing-geometry", option_strings)
         self.assertIn("--fuzzy-query-length-boundary", option_strings)
         self.assertIn("--fuzzy-max-cer-at-or-above-boundary", option_strings)
         self.assertIn(
@@ -1703,12 +1726,16 @@ class ArgumentParserTests(unittest.TestCase):
                 "lowercase",
             ]
         )
+        overwrite_args = parser.parse_args(
+            [*required_arguments, "--overwrite-existing-geometry"]
+        )
         self.assertEqual(default_args.output_text_source, "json")
         self.assertEqual(default_args.output_geometry_format, "bbox")
         self.assertEqual(default_args.candidate_generator, "combined")
         self.assertEqual(default_args.candidate_selector, "cp-sat")
         self.assertIsNone(default_args.text_normalizer)
         self.assertIsNone(default_args.geometry_suffix)
+        self.assertFalse(default_args.overwrite_existing_geometry)
         self.assertEqual(alto_args.output_text_source, "alto")
         self.assertEqual(polygon_args.output_geometry_format, "polygon")
         self.assertEqual(exact_args.candidate_generator, "exact")
@@ -1721,6 +1748,7 @@ class ArgumentParserTests(unittest.TestCase):
             stacked_normalizer_args.text_normalizer,
             ["strip-diacritics", "lowercase"],
         )
+        self.assertTrue(overwrite_args.overwrite_existing_geometry)
 
         with (
             self.assertRaises(SystemExit),

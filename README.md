@@ -281,7 +281,7 @@ Important text-alignment options:
 | `--geometry-suffix` | automatic | Defaults to `_bbox` or `_polygon` from the output format |
 | `--output-text-source` | `json` | Preserve JSON text or replace matched values with original `alto` text |
 | `--text-normalizer` | optional | Normalize both JSON and ALTO comparison texts before alignment; repeat to compose lowercase, diacritic stripping, and punctuation stripping |
-| `--preserve-existing-geometry` | off | Skip values already having the selected sibling geometry key |
+| `--overwrite-existing-geometry` | off | Process and replace existing geometry destinations; otherwise their text values are skipped before matching |
 
 Unicode NFKC normalization and whitespace collapsing always run. Each
 `--text-normalizer` optionally adds a transformation to both the JSON and ALTO

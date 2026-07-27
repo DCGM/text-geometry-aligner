@@ -16,12 +16,12 @@ class JSONGeometryMerger:
     def __init__(
         self,
         geometry_suffix: str = "_bbox",
-        preserve_existing_geometry: bool = False,
+        overwrite_existing_geometry: bool = False,
     ):
         if not geometry_suffix:
             raise ValueError("geometry_suffix must not be empty")
         self.geometry_suffix = geometry_suffix
-        self.preserve_existing_geometry = preserve_existing_geometry
+        self.overwrite_existing_geometry = overwrite_existing_geometry
 
     def create_output(
         self,
@@ -69,7 +69,7 @@ class JSONGeometryMerger:
                 f"Cannot set geometry at {_format_json_path(target_path)} on "
                 f"{type(parent).__name__}"
             )
-        if self.preserve_existing_geometry and component in parent:
+        if not self.overwrite_existing_geometry and component in parent:
             return
         if component in parent:
             logger.debug(

@@ -15,7 +15,7 @@ class JSONTextExtractor:
     def __init__(
         self,
         geometry_suffix: str = "_bbox",
-        preserve_existing_geometry: bool = False,
+        overwrite_existing_geometry: bool = False,
         ignored_geometry_suffixes: Sequence[str] = ("_bbox", "_polygon"),
     ):
         if not geometry_suffix:
@@ -23,7 +23,7 @@ class JSONTextExtractor:
         if any(not suffix for suffix in ignored_geometry_suffixes):
             raise ValueError("ignored geometry suffixes must not be empty")
         self.geometry_suffix = geometry_suffix
-        self.preserve_existing_geometry = preserve_existing_geometry
+        self.overwrite_existing_geometry = overwrite_existing_geometry
         self.ignored_geometry_suffixes = frozenset(
             (*ignored_geometry_suffixes, geometry_suffix)
         )
@@ -71,7 +71,7 @@ class JSONTextExtractor:
 
                     geometry_key = f"{key}{self.geometry_suffix}"
                     if (
-                        self.preserve_existing_geometry
+                        not self.overwrite_existing_geometry
                         and geometry_key in node
                     ):
                         logger.debug("Preserving existing geometry at %s", _format_json_path(child_path))
