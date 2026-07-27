@@ -82,9 +82,20 @@ class CPSATCandidateSelector(CandidateSelector):
         self._maximize_and_fix(model, exact_count, cp_model, "exact matches")
         self._maximize_and_fix(model, matched_count, cp_model, "matched values")
 
-        # Stable final preference. Lower candidate IDs correspond to stable JSON
-        # traversal and ALTO occurrence order. A single worker and fixed seed make
-        # equivalent solutions reproducible in practice.
+        alto_start_cost = sum(
+            selected[candidate.candidate_id] * candidate.start_word
+            for candidate in candidates
+        )
+        self._minimize_and_fix(
+            model,
+            alto_start_cost,
+            cp_model,
+            "ALTO start positions",
+        )
+
+        # Candidate IDs uniquely identify candidates and provide a stable final
+        # fallback when otherwise equivalent solutions have the same aggregate
+        # ALTO start position.
         tie_cost = sum(
             selected[candidate.candidate_id] * (candidate.candidate_id + 1)
             for candidate in candidates
@@ -101,6 +112,21 @@ class CPSATCandidateSelector(CandidateSelector):
 
     def _maximize_and_fix(self, model: Any, expression: Any, cp_model: Any, label: str) -> int:
         model.maximize(expression)
+        solver, status = self._solve(model, cp_model)
+        self._require_status(status, solver, cp_model, label)
+        optimum = int(solver.value(expression))
+        model.add(expression == optimum)
+        logger.debug("CP-SAT optimum for %s: %d", label, optimum)
+        return optimum
+
+    def _minimize_and_fix(
+        self,
+        model: Any,
+        expression: Any,
+        cp_model: Any,
+        label: str,
+    ) -> int:
+        model.minimize(expression)
         solver, status = self._solve(model, cp_model)
         self._require_status(status, solver, cp_model, label)
         optimum = int(solver.value(expression))

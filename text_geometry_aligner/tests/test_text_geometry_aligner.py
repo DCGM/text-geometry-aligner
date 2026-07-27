@@ -1465,6 +1465,32 @@ class OutputTextSourceTests(unittest.TestCase):
     "OR-Tools is not installed",
 )
 class CPSATSelectionTests(unittest.TestCase):
+    def test_equal_matches_prefer_earlier_alto_start_independently_of_id(
+        self,
+    ) -> None:
+        values = (_value(0, "Rome"),)
+        generated = alignment.ExactTextCandidateGenerator().generate(
+            values,
+            alignment.ALTOTextIndex(
+                _page("Rome", "other", "Rome"),
+                alignment.TextNormalizationPipeline.from_optional_names(),
+            ),
+        )
+        earlier, later = generated
+        candidates = (
+            replace(earlier, candidate_id=1),
+            replace(later, candidate_id=0),
+        )
+
+        selected = alignment.CPSATCandidateSelector().select(
+            candidates,
+            values,
+        )
+
+        self.assertEqual(len(selected), 1)
+        self.assertEqual(selected[0].start_word, 0)
+        self.assertEqual(selected[0].candidate_id, 1)
+
     def test_long_near_exact_phrase_beats_short_exact_substring(self) -> None:
         normalizer = alignment.TextNormalizationPipeline.from_optional_names()
         preprocessor = alignment.AlignmentInputNormalizer(normalizer)

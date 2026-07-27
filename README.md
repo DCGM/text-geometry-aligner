@@ -288,6 +288,11 @@ normalizers run in the order supplied. The `ordered-alignment` generator
 assumes JSON values are already in correct reading order and is normally paired
 with `--candidate-selector pass-through`.
 
+CP-SAT first maximizes match quality, exact-match count, and matched-value
+count. If complete solutions remain equal, it prefers candidates whose
+`start_word` positions are closer to the beginning of the ALTO document, then
+uses candidate IDs as a deterministic final fallback.
+
 Fuzzy acceptance defaults:
 
 | Option | Default |
