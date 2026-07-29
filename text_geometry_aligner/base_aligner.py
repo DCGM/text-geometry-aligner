@@ -4,8 +4,8 @@ import argparse
 import logging
 import os
 from abc import ABC, abstractmethod
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Optional
 
 from .alto_io import ALTOPage, ALTOReader
 from .geometry_building import (
@@ -126,17 +126,17 @@ class BaseAligner(ABC):
     def render_geometry_format(self) -> OutputGeometryFormat:
         return self.output_geometry_format
 
-    def align_files(
+    def process_file(
         self,
         alto_file: str | os.PathLike[str],
         input_file: str | os.PathLike[str],
-        json_output_file: str | os.PathLike[str],
+        json_output_file: str | os.PathLike[str] | None = None,
         *,
         input_format: InputFormat | str = InputFormat.JSON,
         image_file: str | os.PathLike[str] | None = None,
         render_output_file: str | os.PathLike[str] | None = None,
     ) -> AlignmentDocument:
-        """Align one input/ALTO pair and return a one-page document."""
+        """Align one input/ALTO pair and optionally export its JSON."""
 
         if (image_file is None) != (render_output_file is None):
             raise ValueError(
@@ -154,10 +154,11 @@ class BaseAligner(ABC):
         parsed_alto = self.alto_reader.read(alto_path)
         self._attach_alto(page, parsed_alto, alto_path)
         self.align_page(parsed_alto, page)
-        self.json_writer.write(
-            self.export_page(page),
-            Path(json_output_file),
-        )
+        if json_output_file is not None:
+            self.json_writer.write(
+                self.export_page(page),
+                Path(json_output_file),
+            )
 
         if image_file is not None and render_output_file is not None:
             self.renderer.render(
@@ -187,56 +188,112 @@ class BaseAligner(ABC):
         render_output_dir: str | os.PathLike[str] | None = None,
         fail_on_missing_alto: bool = False,
     ) -> AlignmentDocument:
-        """Align every top-level input page and optionally export JSON."""
-
+        """Discover top-level files and delegate to :meth:`process_files`."""
         if (images_input_dir is None) != (render_output_dir is None):
             raise ValueError(
-                "images_input_dir and render_output_dir must be provided together"
+                "images_input_dir and render_output_dir must be provided "
+                "together"
             )
 
         parsed_format = self._validate_input_format(input_format)
         alto_dir = Path(alto_input_dir)
         source_dir = Path(input_dir)
-        output_dir = (
-            None
-            if json_output_dir is None
-            else Path(json_output_dir)
-        )
         images_dir = (
             None if images_input_dir is None else Path(images_input_dir)
-        )
-        render_dir = (
-            None if render_output_dir is None else Path(render_output_dir)
         )
         _require_directory(alto_dir, "ALTO input")
         _require_directory(source_dir, "input")
         if images_dir is not None:
             _require_directory(images_dir, "images input")
+
+        alto_files = _directory_files(
+            alto_dir,
+            allowed_suffixes={".xml"},
+        )
+        image_files = (
+            _directory_files(
+                images_dir,
+                allowed_suffixes=IMAGE_EXTENSIONS,
+            )
+            if images_dir is not None
+            else None
+        )
+        input_files = _input_files(source_dir, parsed_format)
+        document = self.process_files(
+            alto_files=alto_files,
+            input_files=input_files,
+            json_output_dir=json_output_dir,
+            input_format=parsed_format,
+            image_files=image_files,
+            render_output_dir=render_output_dir,
+            fail_on_missing_alto=fail_on_missing_alto,
+        )
+        # Directory processing knows the source roots even when either
+        # directory is empty.
+        document.input_path = source_dir
+        document.alto_path = alto_dir
+        return document
+
+    def process_files(
+        self,
+        alto_files: Sequence[str | os.PathLike[str]],
+        input_files: Sequence[str | os.PathLike[str]],
+        json_output_dir: str | os.PathLike[str] | None = None,
+        *,
+        input_format: InputFormat | str = InputFormat.JSON,
+        image_files: Sequence[str | os.PathLike[str]] | None = None,
+        render_output_dir: str | os.PathLike[str] | None = None,
+        fail_on_missing_alto: bool = False,
+    ) -> AlignmentDocument:
+        """Align explicitly supplied input and ALTO files by page key.
+
+        Pages in the returned document follow ``input_files`` order. Files are
+        paired by removing one final extension from each filename.
+        """
+
+        if (image_files is None) != (render_output_dir is None):
+            raise ValueError(
+                "image_files and render_output_dir must be provided together"
+            )
+
+        parsed_format = self._validate_input_format(input_format)
+        input_paths = tuple(Path(path) for path in input_files)
+        alto_paths = tuple(Path(path) for path in alto_files)
+        image_paths = (
+            None
+            if image_files is None
+            else tuple(Path(path) for path in image_files)
+        )
+        output_dir = (
+            None
+            if json_output_dir is None
+            else Path(json_output_dir)
+        )
+        render_dir = (
+            None
+            if render_output_dir is None
+            else Path(render_output_dir)
+        )
         if output_dir is not None:
             output_dir.mkdir(parents=True, exist_ok=True)
         if render_dir is not None:
             render_dir.mkdir(parents=True, exist_ok=True)
 
-        alto_by_key = _files_by_key(
-            alto_dir,
-            allowed_suffixes={".xml"},
-            label="ALTO",
+        input_by_key = _paths_by_key(
+            input_paths,
+            label=f"{parsed_format.value} input",
         )
+        alto_by_key = _paths_by_key(alto_paths, label="ALTO")
         images_by_key = (
-            _files_by_key(
-                images_dir,
-                allowed_suffixes=IMAGE_EXTENSIONS,
-                label="image",
-            )
-            if images_dir is not None
+            _paths_by_key(image_paths, label="image")
+            if image_paths is not None
             else {}
         )
-        input_by_key = _input_files(source_dir, parsed_format)
         document = AlignmentDocument(
             alignment_mode=self.alignment_mode,
             pages=[],
-            input_path=source_dir,
-            alto_path=alto_dir,
+            input_path=_shared_parent(input_paths),
+            alto_path=_shared_parent(alto_paths),
         )
 
         for index, (page_key, input_path) in enumerate(
@@ -275,7 +332,7 @@ class BaseAligner(ABC):
                 )
             document.pages.append(page)
 
-            if images_dir is not None and render_dir is not None:
+            if image_paths is not None and render_dir is not None:
                 image_path = images_by_key.get(page_key)
                 if image_path is None:
                     logger.warning(
@@ -399,30 +456,39 @@ def _page_key(path: Path) -> str:
 def _input_files(
     directory: Path,
     input_format: InputFormat,
-) -> dict[str, Path]:
+) -> list[Path]:
     allowed_suffixes = {".json"} if input_format is InputFormat.JSON else None
-    return _files_by_key(
+    return _directory_files(
         directory,
         allowed_suffixes=allowed_suffixes,
-        label=f"{input_format.value} input",
     )
 
 
-def _files_by_key(
+def _directory_files(
     directory: Path,
     *,
     allowed_suffixes: set[str] | None,
+) -> list[Path]:
+    return [
+        path
+        for path in sorted(directory.iterdir())
+        if path.is_file()
+        and (
+            allowed_suffixes is None
+            or path.suffix.lower() in allowed_suffixes
+        )
+    ]
+
+
+def _paths_by_key(
+    paths: Sequence[Path],
+    *,
     label: str,
 ) -> dict[str, Path]:
     files: dict[str, Path] = {}
-    for path in sorted(directory.iterdir()):
+    for path in paths:
         if not path.is_file():
-            continue
-        if (
-            allowed_suffixes is not None
-            and path.suffix.lower() not in allowed_suffixes
-        ):
-            continue
+            raise FileNotFoundError(f"{label} file not found: {path}")
         key = _page_key(path)
         if key in files:
             raise ValueError(
@@ -431,6 +497,13 @@ def _files_by_key(
             )
         files[key] = path
     return files
+
+
+def _shared_parent(paths: Sequence[Path]) -> Path | None:
+    if not paths:
+        return None
+    parent = paths[0].parent
+    return parent if all(path.parent == parent for path in paths) else None
 
 
 def _require_directory(path: Path, label: str) -> None:

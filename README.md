@@ -1,17 +1,18 @@
 # Text geometry aligner
 
-This package aligns structured text or geometry with word-level ALTO OCR in
-either direction:
+This package aligns structured input with word-level ALTO OCR in either
+direction:
 
-- `TextAligner` finds JSON text in ALTO and writes the geometry of the matched
-  ALTO words.
-- `GeometryAligner` finds ALTO words covered by JSON or YOLO geometry and
-  writes their text.
+- `TextAligner` matches text from JSON and adds geometry derived from ALTO.
+- `GeometryAligner` matches JSON or YOLO geometry and adds text from ALTO.
 
 The aligner name describes the information used for matching, not the
 information it produces. Both directions enrich the same document hierarchy.
 Consequently, the **text alignment pipeline contains a geometry builder**,
 while the **geometry alignment pipeline contains a text builder**.
+
+It can be used from the command line with directories or from Python with
+individual files, explicit file collections, or directories.
 
 ## Shared alignment model
 
@@ -46,11 +47,10 @@ because their output JSON is constructed from the regions.
 
 ## Installation
 
-Install the dependencies needed by this package from the repository root:
+Install the package dependencies from this repository:
 
 ```bash
-python -m pip install \
-  -r requirements.txt
+python -m pip install -r requirements.txt
 ```
 
 The dependency roles are:
@@ -329,57 +329,58 @@ order. `all-over-threshold` retains the word for every eligible region.
 
 ## Command-line usage
 
-Both commands process top-level input files in a directory and pair them with
-ALTO `.xml` files by page key. Output directories are created automatically.
+Both commands process top-level files in the supplied directories and write
+one JSON result per matched page. Output directories are created
+automatically.
 
-### Text alignment CLI
+### Text alignment
 
 ```bash
 python -m text_geometry_aligner.text_aligner \
   --alto-dir data/alto \
   --input-dir data/json \
-  --input-format json \
+  --json-output-dir output/json
+```
+
+Example with optional matching and output configuration:
+
+```bash
+python -m text_geometry_aligner.text_aligner \
+  --alto-dir data/alto \
+  --input-dir data/json \
   --json-output-dir output/json \
   --candidate-generator combined \
   --candidate-selector cp-sat \
-  --output-alto-text-format space-separated \
   --output-alto-geometry-format polygon \
   --text-normalizer lowercase \
-  --text-normalizer strip-diacritics \
-  --text-normalizer strip-punctuation
+  --text-normalizer strip-diacritics
 ```
 
-Important text-alignment options:
+Important options:
 
-| Option | Choices/default | Meaning |
+| Option | Default | Description |
 | --- | --- | --- |
-| `--candidate-generator` | `combined` | `exact`, exact plus bounded fuzzy (`combined`), or `ordered-alignment` |
-| `--candidate-selector` | `cp-sat` | Globally select non-overlapping candidates, or use `pass-through` |
-| `--output-alto-text-format` | `space-separated` | Build `alto_text` from matched ALTO words |
-| `--output-alto-geometry-format` | `bbox` | Build `alto_geometry` as `bbox` or `polygon` |
-| `--geometry-suffix` | automatic | Defaults to `_bbox` or `_polygon` from the output format |
-| `--output-text-source` | `json` | Preserve JSON text or replace matched values with original `alto` text |
-| `--text-normalizer` | optional | Normalize both JSON and ALTO comparison texts before alignment; repeat to compose lowercase, diacritic stripping, and punctuation stripping |
-| `--overwrite-existing-geometry` | off | Process and replace existing geometry destinations; otherwise their text values are skipped before matching |
+| `--candidate-generator` | `combined` | Use `exact`, exact plus fuzzy (`combined`), or `ordered-alignment` matching |
+| `--candidate-selector` | `cp-sat` | Use global `cp-sat` selection or `pass-through` |
+| `--output-alto-text-format` | `space-separated` | Format used to build ALTO-derived text |
+| `--output-alto-geometry-format` | `bbox` | Build `bbox` or `polygon` ALTO geometry |
+| `--geometry-suffix` | output-dependent | Override the generated `_bbox` or `_polygon` suffix |
+| `--output-text-source` | `json` | Retain `json` text or use matched `alto` text |
+| `--text-normalizer` | none | Add comparison normalization; repeat to compose transformations |
+| `--overwrite-existing-geometry` | off | Replace existing geometry destinations |
 
-Unicode NFKC normalization and whitespace collapsing always run. Each
-`--text-normalizer` optionally adds a transformation to both the JSON and ALTO
-comparison texts before alignment. Repeated arguments stack the transformations
+Available optional text normalizers are `lowercase`, `strip-diacritics`, and
+`strip-punctuation`. Unicode normalization and whitespace normalization are
+always applied. Repeated `--text-normalizer` arguments stack transformations
 in the order supplied. The `ordered-alignment` generator assumes JSON values
 are already in correct reading order and is normally paired with
 `--candidate-selector pass-through`.
 
-Normalization is visible in the in-memory alignment hierarchy without
-changing the original text. `input_text_normalized` is populated before
-candidate generation, so it is also available for unmatched regions and is
-not replaced by candidate data. For a successful selection,
-`alto_text_normalized` is read directly from the normalized ALTO index.
-The complete selected candidate is retained separately in
-`text_alignment_candidate`, including its comparison snapshots, word and
-character spans, matching source, edit distance, CER, and similarity.
-Each selected `AlignmentWord` additionally stores its independently normalized
-ALTO token in `text_normalized`. These inspection fields are not added to the
-exported JSON.
+Normalization is visible in the returned alignment document without changing
+the original text. `input_text_normalized` is available even for unmatched
+regions. Successful matches retain `alto_text_normalized`, the complete
+selected candidate, and independently normalized ALTO tokens for inspection.
+These inspection fields are not added to exported JSON.
 
 CP-SAT first maximizes match quality, exact-match count, and matched-value
 count. If complete solutions remain equal, it prefers candidates whose
@@ -397,7 +398,19 @@ Fuzzy acceptance defaults:
 
 Setting the boundary to `0` applies the CER rule to every query.
 
-### Geometry alignment CLI
+### Geometry alignment
+
+With JSON geometry:
+
+```bash
+python -m text_geometry_aligner.geometry_aligner \
+  --alto-dir data/alto \
+  --input-dir data/json \
+  --input-format json \
+  --json-output-dir output/json
+```
+
+With YOLO geometry:
 
 ```bash
 python -m text_geometry_aligner.geometry_aligner \
@@ -407,29 +420,27 @@ python -m text_geometry_aligner.geometry_aligner \
   --json-output-dir output/json \
   --minimum-overlap-coverage 0.65 \
   --overlap-strategy bidirectional-containment \
-  --word-assignment-strategy greatest-coverage \
-  --output-alto-text-format space-separated \
-  --output-geometry-source input \
-  --output-alto-geometry-format bbox
+  --word-assignment-strategy greatest-coverage
 ```
 
-Important geometry-alignment options:
+Important options:
 
-| Option | Choices/default | Meaning |
+| Option | Default | Description |
 | --- | --- | --- |
-| `--input-format` | `json` | Read `json` or `yolo` geometry input |
-| `--geometry-suffix` | `_bbox` | For JSON input, identify geometry keys and derive destination text keys |
-| `--minimum-overlap-coverage` | `0.65` | Minimum selected directional overlap score |
-| `--overlap-strategy` | `bidirectional-containment` | Score by containment in either direction, or use `word-coverage` |
-| `--word-assignment-strategy` | `greatest-coverage` | Choose one winner or use `all-over-threshold` |
-| `--output-alto-text-format` | `space-separated` | Build `alto_text` from assigned ALTO words |
-| `--output-alto-geometry-format` | `bbox` | Build `alto_geometry` as `bbox` or `polygon` |
-| `--output-geometry-source` | `input` | Export and render `input` or ALTO-derived (`alto`) geometry |
-| `--overwrite-existing-text` | off | Process and replace destinations that already exist |
+| `--input-format` | `json` | Read `json` or `yolo` geometry |
+| `--geometry-suffix` | `_bbox` | Identify geometry keys in JSON input |
+| `--minimum-overlap-coverage` | `0.65` | Minimum geometry/word overlap score |
+| `--overlap-strategy` | `bidirectional-containment` | Use containment in either direction or `word-coverage` only |
+| `--word-assignment-strategy` | `greatest-coverage` | Assign a word to one winner or `all-over-threshold` regions |
+| `--output-alto-text-format` | `space-separated` | Format used to build ALTO-derived text |
+| `--output-alto-geometry-format` | `bbox` | Build `bbox` or `polygon` ALTO geometry |
+| `--output-geometry-source` | `input` | Export `input` or ALTO-derived (`alto`) geometry |
+| `--overwrite-existing-text` | off | Replace existing text destinations |
 
-### Rendering
+### Rendering and missing files
 
-Add both common rendering arguments to either command:
+Either command can render the alignments when both image arguments are
+provided:
 
 ```bash
 --images-dir data/images --render-dir output/rendered
@@ -440,105 +451,138 @@ similarity; geometry-alignment labels show average overlap score. Geometry is
 scaled from ALTO page coordinates when the ALTO page dimensions differ from
 the source image dimensions.
 
-Use `--fail-on-missing-alto` to fail rather than skip JSON files without a
-paired ALTO XML file.
+By default, an input without matching ALTO is logged and skipped. Add
+`--fail-on-missing-alto` to stop with an error instead.
 
-## Python API
+Use `--help` to see every available option:
 
-### Text to geometry
+```bash
+python -m text_geometry_aligner.text_aligner --help
+python -m text_geometry_aligner.geometry_aligner --help
+```
 
-The text aligner receives its candidate generator and selector explicitly:
+## Python usage
+
+All path-based methods return an `AlignmentDocument`. JSON output is optional
+for `process_files()` and `process_directories()`, so their returned results
+can be consumed directly by another Python pipeline.
+
+### Create the aligners
 
 ```python
 from text_geometry_aligner import (
-    AnchoredFuzzyTextCandidateGenerator,
     CPSATCandidateSelector,
-    CompositeCandidateGenerator,
     ExactTextCandidateGenerator,
-    FuzzyCandidateConfig,
+    GeometryAligner,
     TextAligner,
 )
 
-candidate_generator = CompositeCandidateGenerator(
-    (
-        ExactTextCandidateGenerator(),
-        AnchoredFuzzyTextCandidateGenerator(FuzzyCandidateConfig()),
-    )
-)
-
-aligner = TextAligner(
-    candidate_generator=candidate_generator,
+text_aligner = TextAligner(
+    candidate_generator=ExactTextCandidateGenerator(),
     candidate_selector=CPSATCandidateSelector(),
-    output_geometry_format="polygon",
-)
-result = aligner.align_files(
-    "data/alto/page.xml",
-    "data/json/page.json",
-    "output/page.json",
 )
 
-print(result.matched_count, result.unmatched_count)
-print(result.pages[0].regions[0].alto_geometry)
+geometry_aligner = GeometryAligner()
 ```
 
-### Geometry to text
+### Process one input and ALTO file
+
+`process_file()` processes one pair. Provide `json_output_file` when the
+result should also be written as JSON:
 
 ```python
-from text_geometry_aligner import GeometryAligner
-
-aligner = GeometryAligner(
-    geometry_suffix="_bbox",
-    minimum_overlap_coverage=0.65,
-    overlap_strategy="bidirectional-containment",
-    word_assignment_strategy="greatest-coverage",
-)
-result = aligner.align_files(
-    "data/alto/page.xml",
-    "data/json/page.json",
-    "output/page.json",
+text_document = text_aligner.process_file(
+    alto_file="data/alto/page_001.xml",
+    input_file="data/json/page_001.json",
+    json_output_file="output/page_001.json",
 )
 
-print(result.matched_count, result.unmatched_count)
-print(result.pages[0].regions[0].alto_text)
+geometry_document = geometry_aligner.process_file(
+    alto_file="data/alto/page_001.xml",
+    input_file="data/yolo/page_001.txt",
+    input_format="yolo",
+)
 ```
 
-For in-memory use, parse or construct an `ALTOPage` and call
-`aligner.align_data(alto_page, input_data)`.
-
-Directory processing can also be used without exporting JSON. The returned
-document contains every enriched page and region:
+Optional rendering requires both paths:
 
 ```python
-document = aligner.process_directories(
+document = geometry_aligner.process_file(
+    alto_file="data/alto/page_001.xml",
+    input_file="data/yolo/page_001.txt",
+    input_format="yolo",
+    image_file="data/images/page_001.jpg",
+    render_output_file="output/rendered/page_001.jpg",
+)
+```
+
+### Process explicit file collections
+
+`process_files()` pairs the supplied paths by `page_key`. The order of
+`input_files` determines the order of pages in the returned document; the
+ALTO list does not need to use the same order.
+
+```python
+document = geometry_aligner.process_files(
+    alto_files=[
+        "data/alto/page_002.full.xml",
+        "data/alto/page_001.full.xml",
+    ],
+    input_files=[
+        "data/yolo/page_001.full.txt",
+        "data/yolo/page_002.full.txt",
+    ],
+    input_format="yolo",
+)
+```
+
+Provide `json_output_dir` when JSON files should also be written:
+
+```python
+document = geometry_aligner.process_files(
+    alto_files=[
+        "data/alto/page_001.xml",
+        "data/alto/page_002.xml",
+    ],
+    input_files=[
+        "data/yolo/page_001.txt",
+        "data/yolo/page_002.txt",
+    ],
+    json_output_dir="output/json",
+    input_format="yolo",
+)
+```
+
+Rendering explicit collections requires both `image_files` and
+`render_output_dir`.
+
+### Process directories
+
+`process_directories()` discovers top-level files and uses the same pairing
+and processing behavior as `process_files()`:
+
+```python
+document = text_aligner.process_directories(
     alto_input_dir="data/alto",
     input_dir="data/json",
+    json_output_dir="output/json",
 )
 ```
 
-Pass `json_output_dir` only when JSON files should also be written.
-
-The adapters and matcher can also be used separately when the intermediate
-hierarchy is needed:
+Geometry alignment with YOLO directories:
 
 ```python
-from pathlib import Path
-from text_geometry_aligner import ALTOReader, GeometryAligner, InputFormat
-
-aligner = GeometryAligner()
-page = aligner.read_input_page(
-    Path("data/yolo/page.labels"),
-    InputFormat.YOLO,
-    page_key="page",
+document = geometry_aligner.process_directories(
+    alto_input_dir="data/alto",
+    input_dir="data/yolo",
+    input_format="yolo",
 )
-
-# Input fields are available; ALTO-derived fields are still None.
-alto_page = ALTOReader().read("data/alto/page.xml")
-aligner.align_page(alto_page, page)
-
-# The same page and region objects now contain alto_text,
-# alto_geometry, and assigned words.
-output_data = aligner.export_page(page)
 ```
+
+Omit `json_output_dir` to return the aligned document without writing JSON.
+For rendering, supply both `images_input_dir` and `render_output_dir`. Set
+`fail_on_missing_alto=True` to reject inputs without matching ALTO instead of
+skipping them.
 
 ## Package structure and extension points
 
@@ -564,7 +608,7 @@ objects in ALTO document order and returns the final string or `None` for an
 empty assignment.
 
 `BaseAligner` provides the shared ALTO text/geometry builder configuration and
-CLI options, file and directory processing, output writing, filename pairing,
-category validation, and optional rendering workflow for both directions.
-Input adapters and exporters are intentionally separate from the matching
-algorithms so additional formats can reuse the same hierarchy.
+CLI options, single-file, file-collection, and directory processing, output
+writing, filename pairing, category validation, and optional rendering for
+both directions. Input adapters and exporters are intentionally separate from
+the matching algorithms so additional formats can reuse the same hierarchy.

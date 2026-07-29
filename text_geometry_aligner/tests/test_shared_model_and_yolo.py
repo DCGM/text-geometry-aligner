@@ -250,6 +250,131 @@ class YOLOAdapterTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "collide"):
             exporter.export(page)
 
+    def test_process_files_pairs_by_key_and_preserves_input_order(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            input_dir = root / "input"
+            alto_dir = root / "alto"
+            input_dir.mkdir()
+            alto_dir.mkdir()
+            first_input = input_dir / "first"
+            second_input = input_dir / "second.labels"
+            first_alto = alto_dir / "first.xml"
+            second_alto = alto_dir / "second.xml"
+            first_input.write_text(
+                "0 25 25 30 10 0.8 PageNumber\n",
+                encoding="utf-8",
+            )
+            second_input.write_text(
+                "0 25 25 30 10 0.9 PageNumber\n",
+                encoding="utf-8",
+            )
+            first_alto.write_text(_alto_xml("1"), encoding="utf-8")
+            second_alto.write_text(_alto_xml("2"), encoding="utf-8")
+            json_writer = mock.create_autospec(
+                alignment.JSONWriter,
+                instance=True,
+            )
+
+            document = alignment.GeometryAligner(
+                json_writer=json_writer,
+            ).process_files(
+                alto_files=[first_alto, second_alto],
+                input_files=[second_input, first_input],
+                input_format=alignment.InputFormat.YOLO,
+            )
+
+            json_writer.write.assert_not_called()
+            self.assertEqual(
+                [page.page_key for page in document.pages],
+                ["second", "first"],
+            )
+            self.assertEqual(
+                [
+                    page.regions[0].alto_text
+                    for page in document.pages
+                ],
+                ["2", "1"],
+            )
+            self.assertEqual(document.input_path, input_dir)
+            self.assertEqual(document.alto_path, alto_dir)
+            self.assertEqual(
+                document.pages[0].input_file_path,
+                second_input,
+            )
+            self.assertEqual(
+                document.pages[0].alto_file_path,
+                second_alto,
+            )
+
+    def test_process_files_supports_json_input_and_export(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            input_file = root / "page.json"
+            alto_file = root / "page.xml"
+            output_dir = root / "output"
+            input_file.write_text(
+                json.dumps(
+                    {
+                        "PageNumber_bbox": {
+                            "x": 10,
+                            "y": 20,
+                            "width": 30,
+                            "height": 10,
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            alto_file.write_text(_alto_xml("12"), encoding="utf-8")
+
+            document = alignment.GeometryAligner().process_files(
+                alto_files=[alto_file],
+                input_files=[input_file],
+                json_output_dir=output_dir,
+            )
+
+            self.assertEqual(document.pages[0].regions[0].alto_text, "12")
+            self.assertEqual(
+                json.loads(
+                    (output_dir / "page.json").read_text(encoding="utf-8")
+                )["PageNumber"],
+                "12",
+            )
+
+    def test_process_files_validates_page_keys_and_missing_alto(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            first_input = root / "page.labels"
+            duplicate_input = root / "page.txt"
+            first_input.write_text("", encoding="utf-8")
+            duplicate_input.write_text("", encoding="utf-8")
+
+            aligner = alignment.GeometryAligner()
+            with self.assertRaisesRegex(ValueError, "Multiple yolo input"):
+                aligner.process_files(
+                    alto_files=[],
+                    input_files=[first_input, duplicate_input],
+                    input_format=alignment.InputFormat.YOLO,
+                )
+
+            document = aligner.process_files(
+                alto_files=[],
+                input_files=[first_input],
+                input_format=alignment.InputFormat.YOLO,
+            )
+            self.assertEqual(document.pages, [])
+
+            with self.assertRaisesRegex(FileNotFoundError, "No ALTO XML"):
+                aligner.process_files(
+                    alto_files=[],
+                    input_files=[first_input],
+                    input_format=alignment.InputFormat.YOLO,
+                    fail_on_missing_alto=True,
+                )
+
     def test_directory_pairing_removes_one_suffix_or_uses_full_name(
         self,
     ) -> None:

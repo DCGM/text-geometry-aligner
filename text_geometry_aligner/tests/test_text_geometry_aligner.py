@@ -229,7 +229,7 @@ class FormatIOTests(unittest.TestCase):
             alignment.BoundingBox(1.0, 2.0, 30.0, 10.0),
         )
 
-    def test_align_files_delegates_format_io(self) -> None:
+    def test_process_file_delegates_format_io(self) -> None:
         alto_reader = mock.create_autospec(
             alignment.ALTOReader,
             instance=True,
@@ -252,7 +252,7 @@ class FormatIOTests(unittest.TestCase):
             candidate_selector=_FirstCandidateSelector(),
         )
 
-        result = aligner.align_files(
+        result = aligner.process_file(
             "page.xml",
             "input.json",
             "output.json",
@@ -264,6 +264,38 @@ class FormatIOTests(unittest.TestCase):
             _output(aligner, result),
             Path("output.json"),
         )
+
+    def test_process_file_can_return_document_without_export(self) -> None:
+        alto_reader = mock.create_autospec(
+            alignment.ALTOReader,
+            instance=True,
+        )
+        json_reader = mock.create_autospec(
+            alignment.JSONReader,
+            instance=True,
+        )
+        json_writer = mock.create_autospec(
+            alignment.JSONWriter,
+            instance=True,
+        )
+        alto_reader.read.return_value = _page("ROME")
+        json_reader.read.return_value = {"title": "Rome"}
+        aligner = alignment.TextAligner(
+            alto_reader=alto_reader,
+            json_reader=json_reader,
+            json_writer=json_writer,
+            candidate_generator=alignment.ExactTextCandidateGenerator(),
+            candidate_selector=_FirstCandidateSelector(),
+        )
+
+        result = aligner.process_file(
+            alto_file="page.xml",
+            input_file="input.json",
+        )
+
+        json_writer.write.assert_not_called()
+        self.assertEqual(len(result.pages), 1)
+        self.assertEqual(result.pages[0].regions[0].input_text, "Rome")
 
 
 class NormalizationTests(unittest.TestCase):
