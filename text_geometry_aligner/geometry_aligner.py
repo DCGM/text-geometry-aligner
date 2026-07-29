@@ -21,6 +21,7 @@ from text_geometry_aligner.geometry_building import (
 )
 from text_geometry_aligner.geometry_matching import (
     GeometryOverlapCalculator,
+    GeometryOverlapStrategy,
     GeometryWordAssigner,
     WordAssignmentStrategy,
     create_overlap_calculator,
@@ -63,7 +64,10 @@ class GeometryAligner(BaseAligner):
         self,
         *,
         geometry_suffix: str = "_bbox",
-        minimum_word_coverage: float = 0.65,
+        minimum_overlap_coverage: float = 0.65,
+        overlap_strategy: GeometryOverlapStrategy | str = (
+            GeometryOverlapStrategy.BIDIRECTIONAL_CONTAINMENT
+        ),
         word_assignment_strategy: WordAssignmentStrategy | str = (
             WordAssignmentStrategy.GREATEST_COVERAGE
         ),
@@ -86,9 +90,9 @@ class GeometryAligner(BaseAligner):
     ):
         if not geometry_suffix:
             raise ValueError("geometry_suffix must not be empty")
-        if not 0.0 <= minimum_word_coverage <= 1.0:
+        if not 0.0 <= minimum_overlap_coverage <= 1.0:
             raise ValueError(
-                "minimum_word_coverage must be within [0, 1]"
+                "minimum_overlap_coverage must be within [0, 1]"
             )
         super().__init__(
             alto_reader=alto_reader,
@@ -100,7 +104,8 @@ class GeometryAligner(BaseAligner):
         )
         self.json_reader = json_reader or JSONReader()
         self.geometry_suffix = geometry_suffix
-        self.minimum_word_coverage = minimum_word_coverage
+        self.minimum_overlap_coverage = minimum_overlap_coverage
+        self.overlap_strategy = GeometryOverlapStrategy(overlap_strategy)
         self.overwrite_existing_text = overwrite_existing_text
         self.output_geometry_source = OutputGeometrySource(
             output_geometry_source
@@ -182,15 +187,16 @@ class GeometryAligner(BaseAligner):
         calculator = self.overlap_calculator or create_overlap_calculator(
             regions
         )
-        coverages = calculator.calculate(
+        overlaps = calculator.calculate(
             regions,
             alto_page.words,
-            self.minimum_word_coverage,
+            self.minimum_overlap_coverage,
+            self.overlap_strategy,
         )
         assignments = self.word_assigner.assign(
             regions,
             alto_page.words,
-            coverages,
+            overlaps,
         )
         regions_by_id = {
             region.region_id: region for region in regions
@@ -202,16 +208,10 @@ class GeometryAligner(BaseAligner):
         for assignment in assignments:
             region = regions_by_id[assignment.region_id]
             words = tuple(
-                words_by_index[index]
-                for index in assignment.word_indexes
+                words_by_index[overlap.word_index]
+                for overlap in assignment.overlaps
             )
             if words:
-                if len(assignment.word_coverages) != len(words):
-                    raise ValueError(
-                        "word coverages and assigned words must have the "
-                        "same length"
-                    )
-
                 alto_text = self.text_builder.build(words)
                 if alto_text is not None:
                     region.words = [
@@ -219,12 +219,19 @@ class GeometryAligner(BaseAligner):
                             word_index=word.index,
                             text=word.text,
                             bbox=word.bbox,
-                            coverage=assignment.word_coverages[index],
+                            word_coverage=overlap.word_coverage,
+                            input_geometry_coverage=(
+                                overlap.input_geometry_coverage
+                            ),
+                            overlap_score=overlap.overlap_score,
                             line_index=word.line_index,
                             block_index=word.block_index,
                             element_id=word.element_id,
                         )
-                        for index, word in enumerate(words)
+                        for word, overlap in zip(
+                            words,
+                            assignment.overlaps,
+                        )
                     ]
                     region.alto_text = alto_text
                     alto_geometry = self.geometry_builder.build(words)
@@ -234,8 +241,11 @@ class GeometryAligner(BaseAligner):
                     )
                     region.alto_geometry = alto_geometry
                     region.alignment_score = (
-                        sum(assignment.word_coverages)
-                        / len(assignment.word_coverages)
+                        sum(
+                            overlap.overlap_score
+                            for overlap in assignment.overlaps
+                        )
+                        / len(assignment.overlaps)
                     )
             if not region.matched:
                 logger.warning(
@@ -245,7 +255,7 @@ class GeometryAligner(BaseAligner):
                 continue
             logger.info(
                 "Matched geometry %s to %d words (%r), average "
-                "coverage=%.4f",
+                "overlap=%.4f",
                 _format_json_path(region.json_geometry_path or ()),
                 len(region.words or ()),
                 region.alto_text,
@@ -277,10 +287,19 @@ def build_argument_parser() -> argparse.ArgumentParser:
         help="Suffix identifying geometry keys in JSON input",
     )
     parser.add_argument(
-        "--minimum-word-coverage",
+        "--minimum-overlap-coverage",
         type=float,
         default=0.65,
-        help="Minimum covered fraction of an ALTO word (default: 0.65)",
+        help="Minimum geometry/word overlap coverage (default: 0.65)",
+    )
+    parser.add_argument(
+        "--overlap-strategy",
+        choices=tuple(item.value for item in GeometryOverlapStrategy),
+        default=GeometryOverlapStrategy.BIDIRECTIONAL_CONTAINMENT.value,
+        help=(
+            "Geometry/word overlap scoring strategy "
+            "(default: bidirectional-containment)"
+        ),
     )
     parser.add_argument(
         "--word-assignment-strategy",
@@ -319,7 +338,8 @@ def main() -> None:
     try:
         aligner = GeometryAligner(
             geometry_suffix=args.geometry_suffix,
-            minimum_word_coverage=args.minimum_word_coverage,
+            minimum_overlap_coverage=args.minimum_overlap_coverage,
+            overlap_strategy=args.overlap_strategy,
             word_assignment_strategy=args.word_assignment_strategy,
             overwrite_existing_text=args.overwrite_existing_text,
             output_geometry_source=args.output_geometry_source,

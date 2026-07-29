@@ -200,11 +200,14 @@ class BoundingBoxOverlapTests(unittest.TestCase):
         self.calculator = alignment.BoundingBoxOverlapCalculator()
         self.word = _word(0, "WORD", 0)
 
-    def _coverage(
+    def _overlap(
         self,
         region_bbox: alignment.BoundingBox,
         threshold: float,
-    ) -> tuple[alignment.WordCoverage, ...]:
+        strategy: alignment.GeometryOverlapStrategy = (
+            alignment.GeometryOverlapStrategy.BIDIRECTIONAL_CONTAINMENT
+        ),
+    ) -> tuple[alignment.GeometryWordOverlap, ...]:
         region = alignment.AlignmentRegion(
             region_id=0,
             label="title",
@@ -216,24 +219,88 @@ class BoundingBoxOverlapTests(unittest.TestCase):
             (region,),
             (self.word,),
             threshold,
+            strategy,
         )
 
     def test_threshold_is_inclusive_and_uses_word_area(self) -> None:
-        at_threshold = self._coverage(
+        at_threshold = self._overlap(
             alignment.BoundingBox(0, 0, 6.5, 10),
             0.65,
+            alignment.GeometryOverlapStrategy.WORD_COVERAGE,
         )
-        below_threshold = self._coverage(
+        below_threshold = self._overlap(
             alignment.BoundingBox(0, 0, 6.49, 10),
+            0.65,
+            alignment.GeometryOverlapStrategy.WORD_COVERAGE,
+        )
+
+        self.assertAlmostEqual(at_threshold[0].word_coverage, 0.65)
+        self.assertAlmostEqual(
+            at_threshold[0].input_geometry_coverage,
+            1.0,
+        )
+        self.assertAlmostEqual(at_threshold[0].overlap_score, 0.65)
+        self.assertEqual(below_threshold, ())
+
+    def test_bidirectional_containment_accepts_tight_detection(self) -> None:
+        overlaps = self._overlap(
+            alignment.BoundingBox(2, 2, 4, 4),
             0.65,
         )
 
-        self.assertAlmostEqual(at_threshold[0].coverage, 0.65)
-        self.assertEqual(below_threshold, ())
+        self.assertEqual(len(overlaps), 1)
+        self.assertAlmostEqual(overlaps[0].word_coverage, 0.16)
+        self.assertAlmostEqual(
+            overlaps[0].input_geometry_coverage,
+            1.0,
+        )
+        self.assertAlmostEqual(overlaps[0].overlap_score, 1.0)
+
+    def test_word_coverage_can_reject_tight_detection(self) -> None:
+        self.assertEqual(
+            self._overlap(
+                alignment.BoundingBox(2, 2, 4, 4),
+                0.65,
+                alignment.GeometryOverlapStrategy.WORD_COVERAGE,
+            ),
+            (),
+        )
+
+    def test_bidirectional_containment_accepts_word_inside_region(self) -> None:
+        overlaps = self._overlap(
+            alignment.BoundingBox(-5, -5, 20, 20),
+            0.65,
+        )
+
+        self.assertEqual(len(overlaps), 1)
+        self.assertAlmostEqual(overlaps[0].word_coverage, 1.0)
+        self.assertAlmostEqual(
+            overlaps[0].input_geometry_coverage,
+            0.25,
+        )
+        self.assertAlmostEqual(overlaps[0].overlap_score, 1.0)
+
+    def test_insufficient_overlap_in_both_directions_is_rejected(self) -> None:
+        self.assertEqual(
+            self._overlap(
+                alignment.BoundingBox(8, 8, 10, 10),
+                0.65,
+            ),
+            (),
+        )
+
+    def test_zero_area_input_geometry_has_no_overlap(self) -> None:
+        self.assertEqual(
+            self._overlap(
+                alignment.BoundingBox(0, 0, 0, 10),
+                0.0,
+            ),
+            (),
+        )
 
     def test_boundary_contact_has_no_coverage_even_at_zero_threshold(self) -> None:
         self.assertEqual(
-            self._coverage(
+            self._overlap(
                 alignment.BoundingBox(10, 0, 5, 10),
                 0.0,
             ),
@@ -293,6 +360,62 @@ class BoundingBoxOverlapTests(unittest.TestCase):
             self.assertRaisesRegex(RuntimeError, "requires Shapely"),
         ):
             alignment.create_overlap_calculator((region,))
+
+    def test_polygon_uses_bidirectional_containment(self) -> None:
+        class FakeShape:
+            def __init__(self, points):
+                xs = [point[0] for point in points]
+                ys = [point[1] for point in points]
+                self.bounds = (min(xs), min(ys), max(xs), max(ys))
+                self.area = (
+                    (self.bounds[2] - self.bounds[0])
+                    * (self.bounds[3] - self.bounds[1])
+                )
+                self.is_empty = False
+                self.is_valid = True
+
+            def intersection(self, other):
+                x_min = max(self.bounds[0], other.bounds[0])
+                y_min = max(self.bounds[1], other.bounds[1])
+                x_max = min(self.bounds[2], other.bounds[2])
+                y_max = min(self.bounds[3], other.bounds[3])
+                area = max(0, x_max - x_min) * max(0, y_max - y_min)
+                return type("Intersection", (), {"area": area})()
+
+        def fake_box(x_min, y_min, x_max, y_max):
+            return FakeShape(
+                (
+                    (x_min, y_min),
+                    (x_max, y_min),
+                    (x_max, y_max),
+                    (x_min, y_max),
+                )
+            )
+
+        region = alignment.AlignmentRegion(
+            region_id=0,
+            label="title",
+            input_geometry=alignment.Polygon(
+                ((2, 2), (6, 2), (6, 6), (2, 6), (2, 2))
+            ),
+        )
+
+        overlaps = alignment.ShapelyOverlapCalculator(
+            geometry_factory=fake_box,
+            polygon_class=FakeShape,
+        ).calculate(
+            (region,),
+            (self.word,),
+            0.65,
+        )
+
+        self.assertEqual(len(overlaps), 1)
+        self.assertAlmostEqual(overlaps[0].word_coverage, 0.16)
+        self.assertAlmostEqual(
+            overlaps[0].input_geometry_coverage,
+            1.0,
+        )
+        self.assertAlmostEqual(overlaps[0].overlap_score, 1.0)
 
     def test_shapely_and_fallback_backends_agree_for_bboxes(self) -> None:
         class FakeShape:
@@ -358,38 +481,79 @@ class WordAssignmentTests(unittest.TestCase):
         )
 
     def test_greatest_coverage_wins_and_ties_use_region_order(self) -> None:
-        coverages = (
-            alignment.WordCoverage(0, 0, 0.7),
-            alignment.WordCoverage(1, 0, 0.8),
-            alignment.WordCoverage(0, 1, 0.9),
-            alignment.WordCoverage(1, 1, 0.9),
+        overlaps = (
+            alignment.GeometryWordOverlap(0, 0, 0.7, 0.5, 0.7),
+            alignment.GeometryWordOverlap(1, 0, 0.8, 0.4, 0.8),
+            alignment.GeometryWordOverlap(0, 1, 0.9, 0.3, 0.9),
+            alignment.GeometryWordOverlap(1, 1, 0.9, 0.3, 0.9),
         )
 
         assigned = alignment.GreatestCoverageWordAssigner().assign(
             self.regions,
             self.words,
-            coverages,
+            overlaps,
         )
 
-        self.assertEqual(assigned[0].word_indexes, (1,))
-        self.assertEqual(assigned[0].word_coverages, (0.9,))
-        self.assertEqual(assigned[1].word_indexes, (0,))
-        self.assertEqual(assigned[1].word_coverages, (0.8,))
+        self.assertEqual(
+            tuple(item.word_index for item in assigned[0].overlaps),
+            (1,),
+        )
+        self.assertEqual(
+            tuple(item.overlap_score for item in assigned[0].overlaps),
+            (0.9,),
+        )
+        self.assertEqual(
+            tuple(item.word_index for item in assigned[1].overlaps),
+            (0,),
+        )
+        self.assertEqual(
+            tuple(item.overlap_score for item in assigned[1].overlaps),
+            (0.8,),
+        )
+
+    def test_equal_scores_prefer_directional_coverages_then_region(self) -> None:
+        overlaps = (
+            alignment.GeometryWordOverlap(0, 0, 0.4, 1.0, 1.0),
+            alignment.GeometryWordOverlap(1, 0, 1.0, 0.4, 1.0),
+            alignment.GeometryWordOverlap(0, 1, 1.0, 0.6, 1.0),
+            alignment.GeometryWordOverlap(1, 1, 1.0, 0.6, 1.0),
+        )
+
+        assigned = alignment.GreatestCoverageWordAssigner().assign(
+            self.regions,
+            self.words,
+            overlaps,
+        )
+
+        self.assertEqual(
+            tuple(item.word_index for item in assigned[0].overlaps),
+            (1,),
+        )
+        self.assertEqual(
+            tuple(item.word_index for item in assigned[1].overlaps),
+            (0,),
+        )
 
     def test_all_over_threshold_retains_shared_words(self) -> None:
-        coverages = (
-            alignment.WordCoverage(0, 0, 0.7),
-            alignment.WordCoverage(1, 0, 0.8),
+        overlaps = (
+            alignment.GeometryWordOverlap(0, 0, 0.7, 0.5, 0.7),
+            alignment.GeometryWordOverlap(1, 0, 0.8, 0.4, 0.8),
         )
 
         assigned = alignment.AllOverThresholdWordAssigner().assign(
             self.regions,
             self.words,
-            coverages,
+            overlaps,
         )
 
-        self.assertEqual(assigned[0].word_indexes, (0,))
-        self.assertEqual(assigned[1].word_indexes, (0,))
+        self.assertEqual(
+            tuple(item.word_index for item in assigned[0].overlaps),
+            (0,),
+        )
+        self.assertEqual(
+            tuple(item.word_index for item in assigned[1].overlaps),
+            (0,),
+        )
 
     def test_aligner_uses_builders_after_assignment(self) -> None:
         text_builder = mock.create_autospec(
@@ -420,6 +584,14 @@ class WordAssignmentTests(unittest.TestCase):
         self.assertEqual(
             region.alto_geometry,
             alignment.BoundingBox(0, 0, 20, 10),
+        )
+        self.assertEqual(
+            tuple(word.word_coverage for word in region.words or ()),
+            (0.8, 0.9),
+        )
+        self.assertEqual(
+            tuple(word.overlap_score for word in region.words or ()),
+            (0.8, 0.9),
         )
         self.assertAlmostEqual(region.alignment_score or 0.0, 0.85)
 
@@ -584,11 +756,11 @@ class GeometryAlignerTests(unittest.TestCase):
 
         self.assertIsNone(_output(aligner, result)["title"])
 
-    def test_geometry_render_label_uses_average_coverage(self) -> None:
+    def test_geometry_render_label_uses_average_overlap_score(self) -> None:
         aligner = alignment.GeometryAligner()
         result = aligner.align_data(
             _page(_word(0, "WORD", 0)),
-            {"title_bbox": _bbox(0, width=8)},
+            {"title_bbox": _bbox(0, width=8, height=20)},
         )
 
         rendered = alignment.PillowAlignmentRenderer._render_alignments(
@@ -626,8 +798,10 @@ class GeometryArgumentParserTests(unittest.TestCase):
                 *required,
                 "--geometry-suffix",
                 "_polygon",
-                "--minimum-word-coverage",
+                "--minimum-overlap-coverage",
                 "0.4",
+                "--overlap-strategy",
+                "word-coverage",
                 "--word-assignment-strategy",
                 "all-over-threshold",
                 "--output-alto-text-format",
@@ -639,7 +813,11 @@ class GeometryArgumentParserTests(unittest.TestCase):
         )
 
         self.assertEqual(defaults.geometry_suffix, "_bbox")
-        self.assertEqual(defaults.minimum_word_coverage, 0.65)
+        self.assertEqual(defaults.minimum_overlap_coverage, 0.65)
+        self.assertEqual(
+            defaults.overlap_strategy,
+            "bidirectional-containment",
+        )
         self.assertEqual(
             defaults.word_assignment_strategy,
             "greatest-coverage",
@@ -656,7 +834,8 @@ class GeometryArgumentParserTests(unittest.TestCase):
         self.assertNotIn("--output-geometry-format", option_strings)
         self.assertFalse(defaults.overwrite_existing_text)
         self.assertEqual(all_matches.geometry_suffix, "_polygon")
-        self.assertEqual(all_matches.minimum_word_coverage, 0.4)
+        self.assertEqual(all_matches.minimum_overlap_coverage, 0.4)
+        self.assertEqual(all_matches.overlap_strategy, "word-coverage")
         self.assertEqual(
             all_matches.word_assignment_strategy,
             "all-over-threshold",
@@ -671,7 +850,7 @@ class GeometryArgumentParserTests(unittest.TestCase):
         )
         self.assertTrue(all_matches.overwrite_existing_text)
 
-    def test_invalid_strategy_is_rejected(self) -> None:
+    def test_invalid_assignment_strategy_is_rejected(self) -> None:
         parser = geometry_aligner_module.build_argument_parser()
         with (
             self.assertRaises(SystemExit),
@@ -686,6 +865,25 @@ class GeometryArgumentParserTests(unittest.TestCase):
                     "--json-output-dir",
                     "output",
                     "--word-assignment-strategy",
+                    "unknown",
+                ]
+            )
+
+    def test_invalid_overlap_strategy_is_rejected(self) -> None:
+        parser = geometry_aligner_module.build_argument_parser()
+        with (
+            self.assertRaises(SystemExit),
+            contextlib.redirect_stderr(io.StringIO()),
+        ):
+            parser.parse_args(
+                [
+                    "--alto-dir",
+                    "alto",
+                    "--input-dir",
+                    "json",
+                    "--json-output-dir",
+                    "output",
+                    "--overlap-strategy",
                     "unknown",
                 ]
             )

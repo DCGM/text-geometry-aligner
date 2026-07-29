@@ -73,7 +73,7 @@ class PillowAlignmentRenderer(AlignmentRenderer):
     ALTO coordinates are scaled to the actual image dimensions when page
     dimensions are present in the ALTO file. Text and geometry are selected
     independently from the input or ALTO-derived region fields. Labels show
-    text similarity for text alignment and average word coverage for geometry
+    text similarity for text alignment and average overlap score for geometry
     alignment.
 
     Pillow is used for all drawing so labels can render Unicode text when the

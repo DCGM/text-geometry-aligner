@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from enum import Enum
 from typing import Any, Callable, Sequence
 
 from ..alto_io import ALTOWord
@@ -13,25 +14,37 @@ from ..models import (
 from ..utils import _format_json_path
 
 
+class GeometryOverlapStrategy(str, Enum):
+    """Score used to accept an input-geometry/ALTO-word overlap."""
+
+    BIDIRECTIONAL_CONTAINMENT = "bidirectional-containment"
+    WORD_COVERAGE = "word-coverage"
+
+
 @dataclass(frozen=True)
-class WordCoverage:
-    """The fraction of one ALTO word covered by one JSON region."""
+class GeometryWordOverlap:
+    """Directional coverages and selected score for one overlap."""
 
     region_id: int
     word_index: int
-    coverage: float
+    word_coverage: float
+    input_geometry_coverage: float
+    overlap_score: float
 
 
 class GeometryOverlapCalculator(ABC):
-    """Calculate eligible region-to-word area coverage."""
+    """Calculate eligible input-geometry/ALTO-word overlaps."""
 
     @abstractmethod
     def calculate(
         self,
         regions: Sequence[AlignmentRegion],
         words: Sequence[ALTOWord],
-        minimum_word_coverage: float,
-    ) -> tuple[WordCoverage, ...]:
+        minimum_overlap_coverage: float,
+        overlap_strategy: GeometryOverlapStrategy | str = (
+            GeometryOverlapStrategy.BIDIRECTIONAL_CONTAINMENT
+        ),
+    ) -> tuple[GeometryWordOverlap, ...]:
         raise NotImplementedError
 
 
@@ -42,19 +55,26 @@ class BoundingBoxOverlapCalculator(GeometryOverlapCalculator):
         self,
         regions: Sequence[AlignmentRegion],
         words: Sequence[ALTOWord],
-        minimum_word_coverage: float,
-    ) -> tuple[WordCoverage, ...]:
-        _validate_threshold(minimum_word_coverage)
+        minimum_overlap_coverage: float,
+        overlap_strategy: GeometryOverlapStrategy | str = (
+            GeometryOverlapStrategy.BIDIRECTIONAL_CONTAINMENT
+        ),
+    ) -> tuple[GeometryWordOverlap, ...]:
+        _validate_threshold(minimum_overlap_coverage)
+        parsed_strategy = GeometryOverlapStrategy(overlap_strategy)
         if any(isinstance(region.input_geometry, Polygon) for region in regions):
             raise RuntimeError(
                 "Polygon geometry alignment requires Shapely. Install it "
                 "with: python -m pip install Shapely"
             )
 
-        coverages: list[WordCoverage] = []
+        overlaps: list[GeometryWordOverlap] = []
         for region in regions:
             geometry = region.input_geometry
             if not isinstance(geometry, BoundingBox):
+                continue
+            input_geometry_area = geometry.width * geometry.height
+            if input_geometry_area <= 0:
                 continue
             for word in words:
                 if word.bbox.width <= 0 or word.bbox.height <= 0:
@@ -66,16 +86,20 @@ class BoundingBoxOverlapCalculator(GeometryOverlapCalculator):
                 )
                 if intersection_area <= 0:
                     continue
-                coverage = intersection_area / word_area
-                if coverage + 1e-12 >= minimum_word_coverage:
-                    coverages.append(
-                        WordCoverage(
-                            region_id=region.region_id,
-                            word_index=word.index,
-                            coverage=coverage,
-                        )
-                    )
-        return tuple(coverages)
+                overlap = _build_overlap(
+                    region_id=region.region_id,
+                    word_index=word.index,
+                    intersection_area=intersection_area,
+                    word_area=word_area,
+                    input_geometry_area=input_geometry_area,
+                    overlap_strategy=parsed_strategy,
+                )
+                if (
+                    overlap.overlap_score + 1e-12
+                    >= minimum_overlap_coverage
+                ):
+                    overlaps.append(overlap)
+        return tuple(overlaps)
 
 
 class ShapelyOverlapCalculator(GeometryOverlapCalculator):
@@ -97,9 +121,13 @@ class ShapelyOverlapCalculator(GeometryOverlapCalculator):
         self,
         regions: Sequence[AlignmentRegion],
         words: Sequence[ALTOWord],
-        minimum_word_coverage: float,
-    ) -> tuple[WordCoverage, ...]:
-        _validate_threshold(minimum_word_coverage)
+        minimum_overlap_coverage: float,
+        overlap_strategy: GeometryOverlapStrategy | str = (
+            GeometryOverlapStrategy.BIDIRECTIONAL_CONTAINMENT
+        ),
+    ) -> tuple[GeometryWordOverlap, ...]:
+        _validate_threshold(minimum_overlap_coverage)
+        parsed_strategy = GeometryOverlapStrategy(overlap_strategy)
         region_shapes = {
             region.region_id: self._region_shape(region)
             for region in regions
@@ -115,11 +143,17 @@ class ShapelyOverlapCalculator(GeometryOverlapCalculator):
             if word.bbox.width > 0 and word.bbox.height > 0
         }
 
-        coverages: list[WordCoverage] = []
+        overlaps: list[GeometryWordOverlap] = []
         for region in regions:
             region_shape = region_shapes[region.region_id]
             geometry = region.input_geometry
             if geometry is None:
+                continue
+            input_geometry_area = _input_geometry_area(
+                geometry,
+                region_shape,
+            )
+            if input_geometry_area <= 0:
                 continue
             region_bounds = geometry.bounds
             for word in words:
@@ -134,16 +168,22 @@ class ShapelyOverlapCalculator(GeometryOverlapCalculator):
                 if intersection_area <= 0:
                     continue
                 word_area = word.bbox.width * word.bbox.height
-                coverage = intersection_area / word_area
-                if coverage + 1e-12 >= minimum_word_coverage:
-                    coverages.append(
-                        WordCoverage(
-                            region_id=region.region_id,
-                            word_index=word.index,
-                            coverage=coverage,
-                        )
+                overlap = _build_overlap(
+                    region_id=region.region_id,
+                    word_index=word.index,
+                    intersection_area=intersection_area,
+                    word_area=word_area,
+                    input_geometry_area=input_geometry_area,
+                    overlap_strategy=parsed_strategy,
+                )
+                if (
+                    overlap.overlap_score + 1e-12
+                    >= minimum_overlap_coverage
+                ):
+                    overlaps.append(
+                        overlap
                     )
-        return tuple(coverages)
+        return tuple(overlaps)
 
     def _region_shape(self, region: AlignmentRegion) -> Any:
         geometry = region.input_geometry
@@ -207,6 +247,49 @@ def _bbox_intersection_area(
     return width * height
 
 
-def _validate_threshold(minimum_word_coverage: float) -> None:
-    if not 0.0 <= minimum_word_coverage <= 1.0:
-        raise ValueError("minimum_word_coverage must be within [0, 1]")
+def _build_overlap(
+    *,
+    region_id: int,
+    word_index: int,
+    intersection_area: float,
+    word_area: float,
+    input_geometry_area: float,
+    overlap_strategy: GeometryOverlapStrategy,
+) -> GeometryWordOverlap:
+    word_coverage = _bounded_ratio(intersection_area, word_area)
+    input_geometry_coverage = _bounded_ratio(
+        intersection_area,
+        input_geometry_area,
+    )
+    overlap_score = (
+        word_coverage
+        if overlap_strategy is GeometryOverlapStrategy.WORD_COVERAGE
+        else max(word_coverage, input_geometry_coverage)
+    )
+    return GeometryWordOverlap(
+        region_id=region_id,
+        word_index=word_index,
+        word_coverage=word_coverage,
+        input_geometry_coverage=input_geometry_coverage,
+        overlap_score=overlap_score,
+    )
+
+
+def _bounded_ratio(numerator: float, denominator: float) -> float:
+    return min(1.0, max(0.0, numerator / denominator))
+
+
+def _input_geometry_area(
+    geometry: BoundingBox | Polygon,
+    shape: Any,
+) -> float:
+    if isinstance(geometry, BoundingBox):
+        return geometry.width * geometry.height
+    return float(shape.area)
+
+
+def _validate_threshold(minimum_overlap_coverage: float) -> None:
+    if not 0.0 <= minimum_overlap_coverage <= 1.0:
+        raise ValueError(
+            "minimum_overlap_coverage must be within [0, 1]"
+        )

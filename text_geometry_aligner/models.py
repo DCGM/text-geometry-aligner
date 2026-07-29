@@ -129,7 +129,9 @@ class AlignmentWord:
     text: str
     bbox: BoundingBox
     text_normalized: str | None = None
-    coverage: float | None = None
+    word_coverage: float | None = None
+    input_geometry_coverage: float | None = None
+    overlap_score: float | None = None
     line_index: int | None = None
     block_index: int | None = None
     element_id: str | None = None

@@ -35,7 +35,8 @@ separate from ALTO-derived fields:
   `alto_text_normalized`, `alto_geometry`, assigned `words`, JSON paths, and
   optional YOLO category metadata.
 - `AlignmentWord` records the selected ALTO word, its normalized comparison
-  text, bbox, ALTO indexes, element ID, and optional word-coverage score.
+  text, bbox, ALTO indexes, element ID, directional coverage values, and the
+  overlap score used for matching.
 
 Fields produced by matching are `None` before matching and remain `None` when
 no match is found. JSON pages additionally retain a private working copy in
@@ -160,10 +161,10 @@ competing regions, and enriches the regions with ALTO text and geometry.
 flowchart LR
     J["JSON bbox/polygon"] --> GE["JSON geometry adapter<br/>regions + retained paths"]
     Y["YOLO detections"] --> YE["YOLO geometry adapter<br/>regions + class metadata"]
-    A["ALTO word boxes and text"] --> OC["Word-area overlap calculation"]
+    A["ALTO word boxes and text"] --> OC["Directional overlap calculation"]
     GE --> OC
     YE --> OC
-    OC --> WC["Eligible word coverages<br/>coverage >= threshold"]
+    OC --> WC["Eligible overlaps<br/>selected score >= threshold"]
     WC --> WA["Word assignment<br/>greatest coverage / retain all"]
     WA --> MW["Assigned ALTO words<br/>in document order"]
     MW --> TB["Text builder<br/>space-separated"]
@@ -172,7 +173,7 @@ flowchart LR
     GB --> M
     M --> JM["JSON exporter"]
     JM --> O["Output JSON"]
-    M --> R["Optional rendering<br/>text + average coverage"]
+    M --> R["Optional rendering<br/>text + average overlap"]
 ```
 
 The text builder is the final step because geometry matching identifies the
@@ -307,16 +308,23 @@ Geometry alignment detects whichever suffix is supplied through
 `--geometry-suffix`; it can parse both bbox and polygon values beneath that
 suffix.
 
-Word coverage is:
+Geometry alignment calculates coverage in both directions:
 
 ```text
-area(JSON geometry ∩ ALTO word bbox) / area(ALTO word bbox)
+word coverage = intersection area / ALTO word area
+input geometry coverage = intersection area / input geometry area
 ```
 
-Therefore, a threshold of `1` requires the complete word box to be covered,
-while `0` accepts any positive intersection. With the default
-`greatest-coverage` assignment, a word belongs to only the eligible region
-covering the largest fraction of it. Ties are resolved by stable JSON traversal
+The default `bidirectional-containment` strategy uses the greater of these two
+values. It therefore accepts both a word contained by a larger region and a
+tight detector region contained by a larger OCR word. The optional
+`word-coverage` strategy uses only the first value. A threshold of `1`
+requires full containment in at least one selected direction, while `0`
+accepts any positive intersection.
+
+With the default `greatest-coverage` assignment, a word belongs only to the
+eligible region with the greatest overlap score. Equal scores prefer greater
+word coverage, then greater input-geometry coverage, then stable input-region
 order. `all-over-threshold` retains the word for every eligible region.
 
 ## Command-line usage
@@ -397,7 +405,8 @@ python -m text_geometry_aligner.geometry_aligner \
   --input-dir data/yolo \
   --input-format yolo \
   --json-output-dir output/json \
-  --minimum-word-coverage 0.65 \
+  --minimum-overlap-coverage 0.65 \
+  --overlap-strategy bidirectional-containment \
   --word-assignment-strategy greatest-coverage \
   --output-alto-text-format space-separated \
   --output-geometry-source input \
@@ -410,7 +419,8 @@ Important geometry-alignment options:
 | --- | --- | --- |
 | `--input-format` | `json` | Read `json` or `yolo` geometry input |
 | `--geometry-suffix` | `_bbox` | For JSON input, identify geometry keys and derive destination text keys |
-| `--minimum-word-coverage` | `0.65` | Minimum covered fraction of each ALTO word |
+| `--minimum-overlap-coverage` | `0.65` | Minimum selected directional overlap score |
+| `--overlap-strategy` | `bidirectional-containment` | Score by containment in either direction, or use `word-coverage` |
 | `--word-assignment-strategy` | `greatest-coverage` | Choose one winner or use `all-over-threshold` |
 | `--output-alto-text-format` | `space-separated` | Build `alto_text` from assigned ALTO words |
 | `--output-alto-geometry-format` | `bbox` | Build `alto_geometry` as `bbox` or `polygon` |
@@ -426,7 +436,7 @@ Add both common rendering arguments to either command:
 ```
 
 Images are paired by filename stem. Text-alignment labels show match
-similarity; geometry-alignment labels show average word coverage. Geometry is
+similarity; geometry-alignment labels show average overlap score. Geometry is
 scaled from ALTO page coordinates when the ALTO page dimensions differ from
 the source image dimensions.
 
@@ -478,7 +488,8 @@ from text_geometry_aligner import GeometryAligner
 
 aligner = GeometryAligner(
     geometry_suffix="_bbox",
-    minimum_word_coverage=0.65,
+    minimum_overlap_coverage=0.65,
+    overlap_strategy="bidirectional-containment",
     word_assignment_strategy="greatest-coverage",
 )
 result = aligner.align_files(

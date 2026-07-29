@@ -11,8 +11,9 @@ from .assignment import (
 from .overlap import (
     BoundingBoxOverlapCalculator,
     GeometryOverlapCalculator,
+    GeometryOverlapStrategy,
+    GeometryWordOverlap,
     ShapelyOverlapCalculator,
-    WordCoverage,
     create_overlap_calculator,
 )
 
@@ -20,12 +21,13 @@ __all__ = [
     "AllOverThresholdWordAssigner",
     "BoundingBoxOverlapCalculator",
     "GeometryOverlapCalculator",
+    "GeometryOverlapStrategy",
+    "GeometryWordOverlap",
     "GeometryWordAssigner",
     "GreatestCoverageWordAssigner",
     "RegionWordAssignment",
     "ShapelyOverlapCalculator",
     "WordAssignmentStrategy",
-    "WordCoverage",
     "create_overlap_calculator",
     "create_word_assigner",
 ]

@@ -85,7 +85,12 @@ class SharedAlignmentModelTests(unittest.TestCase):
         self.assertEqual(region.alto_geometry, input_geometry)
         self.assertEqual(region.words[0].word_index, 7)
         self.assertIsNone(region.words[0].text_normalized)
-        self.assertEqual(region.words[0].coverage, 1.0)
+        self.assertEqual(region.words[0].word_coverage, 1.0)
+        self.assertEqual(
+            region.words[0].input_geometry_coverage,
+            1.0,
+        )
+        self.assertEqual(region.words[0].overlap_score, 1.0)
         self.assertEqual(region.input_geometry, input_geometry)
         self.assertIsNone(region.input_text_normalized)
         self.assertIsNone(region.text_alignment_candidate)

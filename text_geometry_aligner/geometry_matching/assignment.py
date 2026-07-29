@@ -8,7 +8,7 @@ from typing import Sequence
 
 from ..alto_io import ALTOWord
 from ..models import AlignmentRegion
-from .overlap import WordCoverage
+from .overlap import GeometryWordOverlap
 
 
 class WordAssignmentStrategy(str, Enum):
@@ -18,77 +18,65 @@ class WordAssignmentStrategy(str, Enum):
 
 @dataclass(frozen=True)
 class RegionWordAssignment:
-    """Selected ALTO word indexes and coverages for one region."""
+    """Selected ALTO word overlaps for one region."""
 
     region_id: int
-    word_indexes: tuple[int, ...]
-    word_coverages: tuple[float, ...]
+    overlaps: tuple[GeometryWordOverlap, ...]
 
 
 class GeometryWordAssigner(ABC):
-    """Resolve eligible word coverage into final region assignments."""
+    """Resolve eligible overlaps into final region assignments."""
 
     @abstractmethod
     def assign(
         self,
         regions: Sequence[AlignmentRegion],
         words: Sequence[ALTOWord],
-        coverages: Sequence[WordCoverage],
+        overlaps: Sequence[GeometryWordOverlap],
     ) -> tuple[RegionWordAssignment, ...]:
         raise NotImplementedError
 
     @staticmethod
     def _build_assignments(
         regions: Sequence[AlignmentRegion],
-        retained: Sequence[WordCoverage],
+        retained: Sequence[GeometryWordOverlap],
     ) -> tuple[RegionWordAssignment, ...]:
-        coverage_by_region: dict[int, list[WordCoverage]] = defaultdict(list)
-        for coverage in retained:
-            coverage_by_region[coverage.region_id].append(coverage)
+        overlaps_by_region: dict[int, list[GeometryWordOverlap]] = defaultdict(
+            list
+        )
+        for overlap in retained:
+            overlaps_by_region[overlap.region_id].append(overlap)
 
         assignments: list[RegionWordAssignment] = []
         for region in regions:
-            region_coverages = sorted(
-                coverage_by_region.get(region.region_id, ()),
+            region_overlaps = sorted(
+                overlaps_by_region.get(region.region_id, ()),
                 key=lambda item: item.word_index,
             )
             assignments.append(
                 RegionWordAssignment(
                     region_id=region.region_id,
-                    word_indexes=tuple(
-                        coverage.word_index
-                        for coverage in region_coverages
-                    ),
-                    word_coverages=tuple(
-                        coverage.coverage
-                        for coverage in region_coverages
-                    ),
+                    overlaps=tuple(region_overlaps),
                 )
             )
         return tuple(assignments)
 
 
 class GreatestCoverageWordAssigner(GeometryWordAssigner):
-    """Assign each word to its greatest-coverage region."""
+    """Assign each word to its greatest-overlap region."""
 
     def assign(
         self,
         regions: Sequence[AlignmentRegion],
         words: Sequence[ALTOWord],
-        coverages: Sequence[WordCoverage],
+        overlaps: Sequence[GeometryWordOverlap],
     ) -> tuple[RegionWordAssignment, ...]:
         del words
-        best_by_word: dict[int, WordCoverage] = {}
-        for coverage in coverages:
-            current = best_by_word.get(coverage.word_index)
-            if current is None or (
-                coverage.coverage > current.coverage
-                or (
-                    coverage.coverage == current.coverage
-                    and coverage.region_id < current.region_id
-                )
-            ):
-                best_by_word[coverage.word_index] = coverage
+        best_by_word: dict[int, GeometryWordOverlap] = {}
+        for overlap in overlaps:
+            current = best_by_word.get(overlap.word_index)
+            if current is None or _preference(overlap) > _preference(current):
+                best_by_word[overlap.word_index] = overlap
         return self._build_assignments(
             regions,
             tuple(best_by_word.values()),
@@ -96,16 +84,27 @@ class GreatestCoverageWordAssigner(GeometryWordAssigner):
 
 
 class AllOverThresholdWordAssigner(GeometryWordAssigner):
-    """Retain every region-to-word coverage produced by the calculator."""
+    """Retain every eligible region-to-word overlap."""
 
     def assign(
         self,
         regions: Sequence[AlignmentRegion],
         words: Sequence[ALTOWord],
-        coverages: Sequence[WordCoverage],
+        overlaps: Sequence[GeometryWordOverlap],
     ) -> tuple[RegionWordAssignment, ...]:
         del words
-        return self._build_assignments(regions, coverages)
+        return self._build_assignments(regions, overlaps)
+
+
+def _preference(
+    overlap: GeometryWordOverlap,
+) -> tuple[float, float, float, int]:
+    return (
+        overlap.overlap_score,
+        overlap.word_coverage,
+        overlap.input_geometry_coverage,
+        -overlap.region_id,
+    )
 
 
 def create_word_assigner(
