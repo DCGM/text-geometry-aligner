@@ -1,21 +1,43 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
-from pathlib import Path
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
+
+if TYPE_CHECKING:
+    from .text_matching.candidate import AlignmentCandidate
 
 JSONPathPart = str | int
 JSONPath = tuple[JSONPathPart, ...]
-SIMILARITY_SCALE = 1_000_000
-CER_SCALE = 1_000_000
+ScalarText = str | int | float
+
+
+class AlignmentMode(str, Enum):
+    """Information used to select ALTO words."""
+
+    TEXT = "text"
+    GEOMETRY = "geometry"
+
+
+class InputFormat(str, Enum):
+    """Supported sources from which alignment regions can be created."""
+
+    JSON = "json"
+    YOLO = "yolo"
 
 
 class OutputTextSource(str, Enum):
-    """Source text written to matched JSON values and rendered labels."""
+    """Source text written to output and rendered labels."""
 
     JSON = "json"
+    ALTO = "alto"
+
+
+class OutputGeometrySource(str, Enum):
+    """Source geometry written to output and rendered."""
+
+    INPUT = "input"
     ALTO = "alto"
 
 
@@ -28,7 +50,7 @@ class OutputGeometryFormat(str, Enum):
 
 @dataclass(frozen=True)
 class BoundingBox:
-    """Axis-aligned bounding box in the original ALTO coordinate system."""
+    """Axis-aligned box using top-left coordinates."""
 
     x: float
     y: float
@@ -61,7 +83,7 @@ Point = tuple[float, float]
 
 @dataclass(frozen=True)
 class Polygon:
-    """Closed polygon in the original ALTO coordinate system."""
+    """Closed polygon in the ALTO coordinate system."""
 
     points: tuple[Point, ...]
 
@@ -99,230 +121,111 @@ class Polygon:
 OutputGeometry = BoundingBox | Polygon
 
 
-@dataclass(frozen=True)
-class OCRWord:
-    """One ALTO ``String`` element in document order."""
-
-    index: int
-    text: str
-    bbox: BoundingBox
-    line_index: Optional[int] = None
-    block_index: Optional[int] = None
-    element_id: Optional[str] = None
-
-
-@dataclass(frozen=True)
-class ALTOPage:
-    """Parsed ALTO page."""
-
-    source_path: Path
-    words: tuple[OCRWord, ...]
-    page_id: Optional[str] = None
-    width: Optional[float] = None
-    height: Optional[float] = None
-
-
-@dataclass(frozen=True)
-class OCRWordSpan:
-    """Character interval occupied by an ALTO word in normalized page text."""
+@dataclass
+class AlignmentWord:
+    """One ALTO word assigned to an alignment region."""
 
     word_index: int
-    char_start: int
-    char_end: int  # Exclusive.
-
-
-@dataclass(frozen=True)
-class JSONScalarValue:
-    """A scalar JSON value and the path where its geometry will be written."""
-
-    value_id: int
-    path: JSONPath
-    key: str
-    original_value: str | int | float
     text: str
-    normalized_text: str
-    geometry_path: Optional[JSONPath] = None
-
-    @property
-    def query_length(self) -> int:
-        """Normalized non-whitespace length used by optimization."""
-
-        return sum(not character.isspace() for character in self.normalized_text)
-
-
-@dataclass(frozen=True)
-class AlignmentCandidate:
-    """A possible alignment of one JSON value to a contiguous ALTO word range."""
-
-    candidate_id: int
-    value_id: int
-    json_path: JSONPath
-    start_word: int
-    end_word: int  # Inclusive.
-    start_char: int
-    end_char: int  # Exclusive.
-    query_text: str
-    matched_text: str
-    normalized_query_text: str
-    normalized_matched_text: str
-    exact: bool
-    edit_distance: int
-    cer_int: int
-    similarity_int: int
-    query_length: int
-    quality_chars: int
-    source: str
-
-    @property
-    def word_indexes(self) -> range:
-        return range(self.start_word, self.end_word + 1)
-
-
-@dataclass(frozen=True)
-class SelectedAlignment:
-    """Selected candidate together with its final geometry."""
-
-    candidate: AlignmentCandidate
-    geometry: OutputGeometry
-
-
-@dataclass(frozen=True)
-class RenderAlignment:
-    """Direction-neutral data required to render one alignment."""
-
-    alignment_id: int
-    geometry: OutputGeometry
-    text: str
-    score: float
+    bbox: BoundingBox
+    text_normalized: str | None = None
+    coverage: float | None = None
+    line_index: int | None = None
+    block_index: int | None = None
+    element_id: str | None = None
 
 
 @dataclass
-class TextAlignmentResult:
-    """Text-to-geometry result and diagnostics for one JSON/ALTO pair."""
-
-    output_data: Any
-    values: tuple[JSONScalarValue, ...]
-    candidates: tuple[AlignmentCandidate, ...]
-    selected_alignments: tuple[SelectedAlignment, ...]
-    unmatched_value_ids: tuple[int, ...]
-    output_text_source: OutputTextSource = OutputTextSource.JSON
-    output_geometry_format: OutputGeometryFormat = OutputGeometryFormat.BBOX
-    ambiguous_value_ids: tuple[int, ...] = ()
-    conflicted_value_ids: tuple[int, ...] = ()
-
-    @property
-    def matched_count(self) -> int:
-        return len(self.selected_alignments)
-
-    @property
-    def unmatched_count(self) -> int:
-        return len(self.unmatched_value_ids)
-
-    def text_for_alignment(self, alignment: SelectedAlignment) -> str:
-        if self.output_text_source is OutputTextSource.ALTO:
-            return alignment.candidate.matched_text
-        return alignment.candidate.query_text
-
-    @property
-    def render_alignments(self) -> tuple[RenderAlignment, ...]:
-        return tuple(
-            RenderAlignment(
-                alignment_id=alignment.candidate.value_id,
-                geometry=alignment.geometry,
-                text=self.text_for_alignment(alignment),
-                score=alignment.candidate.similarity_int / SIMILARITY_SCALE,
-            )
-            for alignment in self.selected_alignments
-        )
-
-
-@dataclass(frozen=True)
-class JSONGeometryRegion:
-    """One JSON geometry and the suffix-derived text destination it owns."""
+class AlignmentRegion:
+    """One input value or geometry enriched with matched ALTO data."""
 
     region_id: int
-    geometry_path: JSONPath
-    text_path: JSONPath
-    geometry: OutputGeometry
-
-
-@dataclass(frozen=True)
-class GeometryWordAlignment:
-    """ALTO words assigned to one input JSON geometry."""
-
-    region: JSONGeometryRegion
-    word_indexes: tuple[int, ...]
-    word_coverages: tuple[float, ...]
-    extracted_text: Optional[str]
+    label: str
+    input_text: ScalarText | None = None
+    input_text_normalized: str | None = None
+    input_geometry: OutputGeometry | None = None
+    text_alignment_candidate: AlignmentCandidate | None = None
+    alto_text: str | None = None
+    alto_text_normalized: str | None = None
+    alto_geometry: OutputGeometry | None = None
+    words: list[AlignmentWord] | None = None
+    category_id: int | None = None
+    input_geometry_confidence: float | None = None
+    json_text_path: JSONPath | None = None
+    json_geometry_path: JSONPath | None = None
+    alignment_score: float | None = None
 
     def __post_init__(self) -> None:
-        if len(self.word_indexes) != len(self.word_coverages):
-            raise ValueError(
-                "word_indexes and word_coverages must have the same length"
-            )
-        if tuple(sorted(set(self.word_indexes))) != self.word_indexes:
-            raise ValueError(
-                "word_indexes must be unique and in ALTO document order"
-            )
-        if any(
-            not 0.0 <= coverage <= 1.0
-            for coverage in self.word_coverages
+        if self.region_id < 0:
+            raise ValueError("region_id must not be negative")
+        if not self.label:
+            raise ValueError("label must not be empty")
+        if self.category_id is not None and self.category_id < 0:
+            raise ValueError("category_id must not be negative")
+        if (
+            self.input_geometry_confidence is not None
+            and not 0.0 <= self.input_geometry_confidence <= 1.0
         ):
-            raise ValueError("word_coverages must be within [0, 1]")
-        if bool(self.word_indexes) != (self.extracted_text is not None):
             raise ValueError(
-                "extracted_text must be present exactly when words are assigned"
+                "input_geometry_confidence must be within [0, 1]"
             )
+        if self.alignment_score is not None and not 0.0 <= self.alignment_score <= 1.0:
+            raise ValueError("alignment_score must be within [0, 1]")
 
     @property
-    def average_coverage(self) -> float:
-        if not self.word_coverages:
-            return 0.0
-        return sum(self.word_coverages) / len(self.word_coverages)
+    def matched(self) -> bool:
+        return self.words is not None
 
 
 @dataclass
-class GeometryAlignmentResult:
-    """Geometry-to-text result for one JSON/ALTO pair."""
+class AlignmentPage:
+    """One input page and its ALTO enrichment."""
 
-    output_data: Any
-    regions: tuple[JSONGeometryRegion, ...]
-    alignments: tuple[GeometryWordAlignment, ...]
+    page_key: str
+    input_format: InputFormat
+    regions: list[AlignmentRegion]
+    input_file_path: Path | None = None
+    alto_file_path: Path | None = None
+    json_source_data: dict[str, Any] | None = field(
+        default=None,
+        repr=False,
+    )
+    alto_page_id: str | None = None
+    alto_width: float | None = None
+    alto_height: float | None = None
+
+    def __post_init__(self) -> None:
+        if not self.page_key:
+            raise ValueError("page_key must not be empty")
+        region_ids = [region.region_id for region in self.regions]
+        if len(region_ids) != len(set(region_ids)):
+            raise ValueError("region IDs must be unique within a page")
 
     @property
     def matched_count(self) -> int:
-        return sum(
-            alignment.extracted_text is not None
-            for alignment in self.alignments
-        )
+        return sum(region.matched for region in self.regions)
 
     @property
     def unmatched_count(self) -> int:
-        return len(self.alignments) - self.matched_count
+        return len(self.regions) - self.matched_count
+
+
+@dataclass
+class AlignmentDocument:
+    """Complete multi-page alignment container."""
+
+    alignment_mode: AlignmentMode
+    pages: list[AlignmentPage]
+    input_path: Path | None = None
+    alto_path: Path | None = None
 
     @property
-    def unmatched_region_ids(self) -> tuple[int, ...]:
-        return tuple(
-            alignment.region.region_id
-            for alignment in self.alignments
-            if alignment.extracted_text is None
-        )
+    def matched_count(self) -> int:
+        return sum(page.matched_count for page in self.pages)
 
     @property
-    def render_alignments(self) -> tuple[RenderAlignment, ...]:
-        return tuple(
-            RenderAlignment(
-                alignment_id=alignment.region.region_id,
-                geometry=alignment.region.geometry,
-                text=(
-                    alignment.extracted_text
-                    if alignment.extracted_text is not None
-                    else "null"
-                ),
-                score=alignment.average_coverage,
-            )
-            for alignment in self.alignments
-        )
+    def unmatched_count(self) -> int:
+        return sum(page.unmatched_count for page in self.pages)
 
 
 def _clean_number(value: float) -> int | float:

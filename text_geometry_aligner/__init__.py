@@ -1,12 +1,13 @@
-"""Bidirectional JSON text/geometry alignment against ALTO OCR."""
+"""Bidirectional text/geometry alignment against word-level ALTO OCR."""
 
-from .alto_io import ALTOReader
-from .alto_processing import ALTOTextIndex
+from .alto_io import ALTOPage, ALTOReader, ALTOWord
+from .alto_processing import ALTOTextIndex, ALTOWordSpan
 from .base_aligner import BaseAligner
 from .geometry_building import (
     GeometryBuilder,
     OrthogonalPolygonGeometryBuilder,
     UnionBoundingBoxGeometryBuilder,
+    validate_geometry_format,
 )
 from .geometry_matching import (
     AllOverThresholdWordAssigner,
@@ -14,6 +15,7 @@ from .geometry_matching import (
     GeometryOverlapCalculator,
     GeometryWordAssigner,
     GreatestCoverageWordAssigner,
+    RegionWordAssignment,
     ShapelyOverlapCalculator,
     WordAssignmentStrategy,
     WordCoverage,
@@ -22,10 +24,42 @@ from .geometry_matching import (
 )
 from .json_io import JSONReader, JSONWriter
 from .json_processing import (
+    AlignmentJSONExporter,
     JSONGeometryExtractor,
-    JSONGeometryMerger,
     JSONTextExtractor,
-    JSONTextMerger,
+)
+from .models import (
+    AlignmentDocument,
+    AlignmentMode,
+    AlignmentPage,
+    AlignmentRegion,
+    AlignmentWord,
+    BoundingBox,
+    InputFormat,
+    JSONPath,
+    OutputGeometry,
+    OutputGeometryFormat,
+    OutputGeometrySource,
+    OutputTextSource,
+    Point,
+    Polygon,
+    ScalarText,
+)
+from .normalization import (
+    DiacriticStrippingTextNormalizer,
+    LowercaseTextNormalizer,
+    PunctuationStrippingTextNormalizer,
+    TextNormalizationPipeline,
+    TextNormalizer,
+    UnicodeTextNormalizer,
+    WhitespaceTextNormalizer,
+)
+from .rendering import AlignmentRenderer, PillowAlignmentRenderer
+from .text_building import SpaceSeparatedTextBuilder, TextBuilder
+from .text_matching import (
+    CER_SCALE,
+    SIMILARITY_SCALE,
+    AlignmentCandidate,
 )
 from .text_matching.candidate_generators import (
     AnchoredFuzzyTextCandidateGenerator,
@@ -41,40 +75,8 @@ from .text_matching.candidate_selectors import (
     CandidateSelector,
     PassThroughCandidateSelector,
 )
-from .models import (
-    ALTOPage,
-    CER_SCALE,
-    SIMILARITY_SCALE,
-    AlignmentCandidate,
-    BoundingBox,
-    GeometryAlignmentResult,
-    GeometryWordAlignment,
-    JSONGeometryRegion,
-    JSONScalarValue,
-    OCRWord,
-    OCRWordSpan,
-    OutputGeometry,
-    OutputGeometryFormat,
-    OutputTextSource,
-    Point,
-    Polygon,
-    RenderAlignment,
-    SelectedAlignment,
-    TextAlignmentResult,
-)
-from .normalization import (
-    DiacriticStrippingTextNormalizer,
-    LowercaseTextNormalizer,
-    PunctuationStrippingTextNormalizer,
-    StrictTextNormalizer,
-    TextNormalizationPipeline,
-    TextNormalizer,
-    UnicodeTextNormalizer,
-    WhitespaceTextNormalizer,
-)
-from .preprocessing import AlignmentInputNormalizer
-from .rendering import AlignmentRenderer, PillowAlignmentRenderer
-from .text_building import SpaceSeparatedTextBuilder, TextBuilder
+from .yolo_io import YOLODetection, YOLOReader
+from .yolo_processing import YOLOGeometryExtractor
 
 
 def __getattr__(name: str):
@@ -90,33 +92,74 @@ def __getattr__(name: str):
 
 
 __all__ = [
-    "ALTOPage", "ALTOReader", "ALTOTextIndex", "AlignmentCandidate",
-    "AlignmentInputNormalizer", "AlignmentRenderer",
+    "ALTOPage",
+    "ALTOReader",
+    "ALTOTextIndex",
+    "ALTOWord",
+    "AlignmentCandidate",
+    "AlignmentDocument",
+    "AlignmentJSONExporter",
+    "AlignmentMode",
+    "AlignmentPage",
+    "AlignmentRegion",
+    "AlignmentRenderer",
+    "AlignmentWord",
     "AllOverThresholdWordAssigner",
-    "AnchoredFuzzyTextCandidateGenerator", "BaseAligner",
-    "BoundingBox", "BoundingBoxOverlapCalculator", "CER_SCALE",
-    "CPSATCandidateSelector", "CandidateGenerator", "CandidateSelector",
+    "AnchoredFuzzyTextCandidateGenerator",
+    "BaseAligner",
+    "BoundingBox",
+    "BoundingBoxOverlapCalculator",
+    "CER_SCALE",
+    "CPSATCandidateSelector",
+    "CandidateGenerator",
+    "CandidateSelector",
     "CompositeCandidateGenerator",
-    "DiacriticStrippingTextNormalizer", "ExactTextCandidateGenerator",
-    "FuzzyCandidateConfig", "GeometryAligner", "GeometryAlignmentResult",
-    "GeometryBuilder", "GeometryOverlapCalculator",
-    "GeometryWordAlignment",
-    "GeometryWordAssigner", "GreatestCoverageWordAssigner",
-    "JSONGeometryExtractor", "JSONGeometryMerger",
-    "JSONGeometryRegion", "JSONReader", "JSONScalarValue",
-    "JSONTextExtractor", "JSONTextMerger", "JSONWriter",
-    "LowercaseTextNormalizer", "OCRWord",
-    "OCRWordSpan", "OutputGeometry", "OutputGeometryFormat", "OutputTextSource",
-    "OrderedAlignmentCandidateConfig", "OrderedAlignmentCandidateGenerator",
-    "PillowAlignmentRenderer", "Point", "Polygon", "RenderAlignment",
-    "PassThroughCandidateSelector",
+    "DiacriticStrippingTextNormalizer",
+    "ExactTextCandidateGenerator",
+    "FuzzyCandidateConfig",
+    "GeometryAligner",
+    "GeometryBuilder",
+    "GeometryOverlapCalculator",
+    "GeometryWordAssigner",
+    "GreatestCoverageWordAssigner",
+    "InputFormat",
+    "JSONGeometryExtractor",
+    "JSONPath",
+    "JSONReader",
+    "JSONTextExtractor",
+    "JSONWriter",
+    "LowercaseTextNormalizer",
+    "ALTOWordSpan",
     "OrthogonalPolygonGeometryBuilder",
+    "OutputGeometry",
+    "OutputGeometryFormat",
+    "OutputGeometrySource",
+    "OutputTextSource",
+    "OrderedAlignmentCandidateConfig",
+    "OrderedAlignmentCandidateGenerator",
+    "PassThroughCandidateSelector",
+    "PillowAlignmentRenderer",
+    "Point",
+    "Polygon",
     "PunctuationStrippingTextNormalizer",
-    "SIMILARITY_SCALE", "SelectedAlignment", "ShapelyOverlapCalculator",
-    "StrictTextNormalizer", "TextAligner", "TextAlignmentResult",
-    "SpaceSeparatedTextBuilder", "TextBuilder",
-    "TextNormalizationPipeline", "TextNormalizer",
-    "UnicodeTextNormalizer", "UnionBoundingBoxGeometryBuilder",
-    "WhitespaceTextNormalizer", "WordAssignmentStrategy", "WordCoverage",
-    "create_overlap_calculator", "create_word_assigner",
+    "RegionWordAssignment",
+    "SIMILARITY_SCALE",
+    "ScalarText",
+    "ShapelyOverlapCalculator",
+    "SpaceSeparatedTextBuilder",
+    "TextAligner",
+    "TextBuilder",
+    "TextNormalizationPipeline",
+    "TextNormalizer",
+    "UnicodeTextNormalizer",
+    "UnionBoundingBoxGeometryBuilder",
+    "validate_geometry_format",
+    "WhitespaceTextNormalizer",
+    "WordAssignmentStrategy",
+    "WordCoverage",
+    "YOLODetection",
+    "YOLOGeometryExtractor",
+    "YOLOReader",
+    "create_overlap_calculator",
+    "create_word_assigner",
 ]

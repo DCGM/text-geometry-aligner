@@ -6,7 +6,8 @@ from abc import ABC, abstractmethod
 from typing import Sequence
 
 from ...alto_processing import ALTOTextIndex
-from ...models import AlignmentCandidate, JSONScalarValue
+from ...models import AlignmentRegion
+from ..candidate import AlignmentCandidate
 
 
 class CandidateGenerator(ABC):
@@ -15,7 +16,7 @@ class CandidateGenerator(ABC):
     @abstractmethod
     def generate(
         self,
-        values: Sequence[JSONScalarValue],
+        regions: Sequence[AlignmentRegion],
         alto_index: ALTOTextIndex,
     ) -> tuple[AlignmentCandidate, ...]:
         raise NotImplementedError

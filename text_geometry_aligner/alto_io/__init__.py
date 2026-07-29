@@ -1,5 +1,5 @@
 """ALTO file reading and future writing."""
 
-from .reader import ALTOReader
+from .reader import ALTOPage, ALTOReader, ALTOWord
 
-__all__ = ["ALTOReader"]
+__all__ = ["ALTOPage", "ALTOReader", "ALTOWord"]

@@ -98,14 +98,3 @@ class TextNormalizationPipeline(TextNormalizer):
         stages.extend(cls.OPTIONAL_NORMALIZERS[name]() for name in names)
         stages.append(WhitespaceTextNormalizer())
         return cls(stages)
-
-class StrictTextNormalizer(TextNormalizationPipeline):
-    """Backward-compatible NFKC/casefold/whitespace normalization preset."""
-
-    def __init__(self, unicode_form: str = "NFKC", casefold: bool = True):
-        optional_names: Sequence[str] = ("lowercase",) if casefold else ()
-        pipeline = TextNormalizationPipeline.from_optional_names(
-            optional_names,
-            unicode_form=unicode_form,
-        )
-        super().__init__(pipeline.normalizers)

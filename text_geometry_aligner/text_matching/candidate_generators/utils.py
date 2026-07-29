@@ -4,7 +4,29 @@ from __future__ import annotations
 
 from typing import Any
 
-from ...models import AlignmentCandidate
+from ...models import AlignmentRegion
+from ..candidate import AlignmentCandidate
+
+
+def input_text(region: AlignmentRegion) -> str:
+    """Return one region's raw input text as a matching string."""
+
+    return "" if region.input_text is None else str(region.input_text)
+
+
+def normalized_input_text(region: AlignmentRegion) -> str:
+    """Return one region's normalized input text for matching."""
+
+    return region.input_text_normalized or ""
+
+
+def normalized_query_length(region: AlignmentRegion) -> int:
+    """Count non-whitespace characters in normalized input text."""
+
+    return sum(
+        not character.isspace()
+        for character in normalized_input_text(region)
+    )
 
 
 def replace_candidate_id(
@@ -13,8 +35,8 @@ def replace_candidate_id(
 ) -> AlignmentCandidate:
     return AlignmentCandidate(
         candidate_id=candidate_id,
-        value_id=candidate.value_id,
-        json_path=candidate.json_path,
+        region_id=candidate.region_id,
+        json_text_path=candidate.json_text_path,
         start_word=candidate.start_word,
         end_word=candidate.end_word,
         start_char=candidate.start_char,
@@ -35,7 +57,7 @@ def replace_candidate_id(
 
 def candidate_sort_key(candidate: AlignmentCandidate) -> tuple[Any, ...]:
     return (
-        candidate.value_id,
+        candidate.region_id,
         candidate.start_word,
         candidate.end_word,
         -int(candidate.exact),

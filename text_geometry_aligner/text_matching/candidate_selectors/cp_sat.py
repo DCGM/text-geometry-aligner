@@ -6,7 +6,8 @@ import logging
 from collections import defaultdict
 from typing import Any, Optional, Sequence
 
-from ...models import AlignmentCandidate, JSONScalarValue
+from ...models import AlignmentRegion
+from ..candidate import AlignmentCandidate
 from .base import CandidateSelector
 
 logger = logging.getLogger(__name__)
@@ -26,7 +27,7 @@ class CPSATCandidateSelector(CandidateSelector):
     def select(
         self,
         candidates: Sequence[AlignmentCandidate],
-        values: Sequence[JSONScalarValue],
+        regions: Sequence[AlignmentRegion],
     ) -> tuple[AlignmentCandidate, ...]:
         if not candidates:
             return ()
@@ -49,7 +50,7 @@ class CPSATCandidateSelector(CandidateSelector):
         candidates_by_word: dict[int, list[AlignmentCandidate]] = defaultdict(list)
 
         for candidate in candidates:
-            candidates_by_value[candidate.value_id].append(candidate)
+            candidates_by_value[candidate.region_id].append(candidate)
             for word_index in candidate.word_indexes:
                 candidates_by_word[word_index].append(candidate)
 

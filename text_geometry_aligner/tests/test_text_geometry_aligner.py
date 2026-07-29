@@ -12,6 +12,7 @@ from unittest import mock
 
 import text_geometry_aligner as alignment
 from text_geometry_aligner import (
+    base_aligner as base_aligner_module,
     text_aligner as aligner_module,
 )
 from text_geometry_aligner.text_matching.candidate_generators import (
@@ -103,7 +104,7 @@ def _page(*texts: str, block_indexes: tuple[int, ...] | None = None) -> alignmen
     if block_indexes is None:
         block_indexes = (0,) * len(texts)
     words = tuple(
-        alignment.OCRWord(
+        alignment.ALTOWord(
             index=index,
             text=text,
             bbox=alignment.BoundingBox(index * 10, 0, 9, 10),
@@ -115,14 +116,13 @@ def _page(*texts: str, block_indexes: tuple[int, ...] | None = None) -> alignmen
     return alignment.ALTOPage(source_path=Path("test.xml"), words=words)
 
 
-def _value(value_id: int, text: str) -> alignment.JSONScalarValue:
-    return alignment.JSONScalarValue(
-        value_id=value_id,
-        path=(f"value_{value_id}",),
-        key=f"value_{value_id}",
-        original_value=text,
-        text=text,
-        normalized_text=text.casefold(),
+def _value(value_id: int, text: str) -> alignment.AlignmentRegion:
+    return alignment.AlignmentRegion(
+        region_id=value_id,
+        label=f"value_{value_id}",
+        input_text=text,
+        input_text_normalized=text.casefold(),
+        json_text_path=(f"value_{value_id}",),
     )
 
 
@@ -130,6 +130,19 @@ def _lowercase_normalizer() -> alignment.TextNormalizationPipeline:
     return alignment.TextNormalizationPipeline.from_optional_names(
         ("lowercase",)
     )
+
+
+def _normalize_regions(
+    regions: tuple[alignment.AlignmentRegion, ...],
+    normalizer: alignment.TextNormalizer,
+) -> tuple[alignment.AlignmentRegion, ...]:
+    for region in regions:
+        region.input_text_normalized = (
+            None
+            if region.input_text is None
+            else normalizer.normalize(str(region.input_text))
+        )
+    return regions
 
 
 def _combined_generator(
@@ -143,13 +156,17 @@ def _combined_generator(
     )
 
 
+def _output(aligner, document):
+    return aligner.export_page(document.pages[0])
+
+
 class _FirstCandidateSelector:
-    def select(self, candidates, values):
+    def select(self, candidates, regions):
         return tuple(candidates[:1])
 
 
 class _AllCandidateSelector:
-    def select(self, candidates, values):
+    def select(self, candidates, regions):
         return tuple(candidates)
 
 
@@ -158,8 +175,8 @@ class _StaticCandidateGenerator(alignment.CandidateGenerator):
         self.candidates = tuple(candidates)
         self.calls = []
 
-    def generate(self, values, alto_index):
-        self.calls.append((values, alto_index))
+    def generate(self, regions, alto_index):
+        self.calls.append((regions, alto_index))
         return self.candidates
 
 
@@ -244,12 +261,36 @@ class FormatIOTests(unittest.TestCase):
         alto_reader.read.assert_called_once_with(Path("page.xml"))
         json_reader.read.assert_called_once_with(Path("input.json"))
         json_writer.write.assert_called_once_with(
-            result.output_data,
+            _output(aligner, result),
             Path("output.json"),
         )
 
 
 class NormalizationTests(unittest.TestCase):
+    @staticmethod
+    def _candidate(**changes) -> alignment.AlignmentCandidate:
+        candidate = alignment.AlignmentCandidate(
+            candidate_id=0,
+            region_id=0,
+            json_text_path=("title",),
+            start_word=0,
+            end_word=0,
+            start_char=0,
+            end_char=4,
+            query_text="Raw input",
+            matched_text="ALTO",
+            normalized_query_text="candidate query",
+            normalized_matched_text="candidate match",
+            exact=False,
+            edit_distance=1,
+            cer_int=1000,
+            similarity_int=9000,
+            query_length=15,
+            quality_chars=14,
+            source="test",
+        )
+        return replace(candidate, **changes)
+
     def test_default_pipeline_preserves_case(self) -> None:
         pipeline = alignment.TextNormalizationPipeline.from_optional_names()
         self.assertEqual(pipeline.normalize(" Straße  TEST "), "Straße TEST")
@@ -260,28 +301,112 @@ class NormalizationTests(unittest.TestCase):
         )
         self.assertEqual(pipeline.normalize(" ČESKÝ—Krumlov! "), "cesky krumlov")
 
-    def test_preprocessing_does_not_mutate_raw_values_or_alto(self) -> None:
+    def test_alignment_retains_raw_and_normalized_text(self) -> None:
         pipeline = alignment.TextNormalizationPipeline.from_optional_names(
             ("lowercase", "strip-diacritics", "strip-punctuation")
         )
-        extractor = alignment.JSONTextExtractor()
-        raw_values = extractor.extract({"city": "ŘÍM"})
-        preprocessor = alignment.AlignmentInputNormalizer(pipeline)
-        normalized_values = preprocessor.normalize_values(raw_values)
         page = _page("ŘÍM!")
-        alto_index = preprocessor.build_alto_index(page)
-        exact_candidates = alignment.ExactTextCandidateGenerator().generate(
-            normalized_values,
-            alto_index,
+        aligner = alignment.TextAligner(
+            candidate_generator=alignment.ExactTextCandidateGenerator(),
+            candidate_selector=alignment.PassThroughCandidateSelector(),
+            normalizer=pipeline,
+        )
+        result = aligner.align_data(page, {"city": "ŘÍM"})
+        region = result.pages[0].regions[0]
+        word = region.words[0]
+
+        self.assertEqual(region.input_text, "ŘÍM")
+        self.assertEqual(region.input_text_normalized, "rim")
+        self.assertEqual(region.alto_text, "ŘÍM!")
+        self.assertEqual(region.alto_text_normalized, "rim")
+        self.assertEqual(word.text, "ŘÍM!")
+        self.assertEqual(word.text_normalized, "rim")
+        self.assertEqual(page.words[0].text, "ŘÍM!")
+
+    def test_unmatched_region_retains_only_normalized_input_text(self) -> None:
+        pipeline = alignment.TextNormalizationPipeline.from_optional_names(
+            ("lowercase",)
+        )
+        aligner = alignment.TextAligner(
+            candidate_generator=alignment.ExactTextCandidateGenerator(),
+            candidate_selector=alignment.PassThroughCandidateSelector(),
+            normalizer=pipeline,
         )
 
-        self.assertEqual(raw_values[0].normalized_text, "")
-        self.assertEqual(raw_values[0].text, "ŘÍM")
-        self.assertEqual(normalized_values[0].normalized_text, "rim")
-        self.assertEqual(page.words[0].text, "ŘÍM!")
-        self.assertEqual(alto_index.normalized_words, ["rim"])
-        self.assertEqual(len(exact_candidates), 1)
-        self.assertTrue(exact_candidates[0].exact)
+        result = aligner.align_data(_page("different"), {"title": "TITLE"})
+        region = result.pages[0].regions[0]
+
+        self.assertEqual(region.input_text, "TITLE")
+        self.assertEqual(region.input_text_normalized, "title")
+        self.assertIsNone(region.text_alignment_candidate)
+        self.assertIsNone(region.alto_text)
+        self.assertIsNone(region.alto_text_normalized)
+        self.assertIsNone(region.words)
+
+    def test_normalization_to_empty_produces_no_candidate(self) -> None:
+        pipeline = alignment.TextNormalizationPipeline.from_optional_names(
+            ("strip-punctuation",)
+        )
+        aligner = alignment.TextAligner(
+            candidate_generator=alignment.ExactTextCandidateGenerator(),
+            candidate_selector=alignment.PassThroughCandidateSelector(),
+            normalizer=pipeline,
+        )
+
+        result = aligner.align_data(_page("text"), {"mark": "!!!"})
+        region = result.pages[0].regions[0]
+
+        self.assertEqual(region.input_text_normalized, "")
+        self.assertIsNone(region.alto_text_normalized)
+        self.assertIsNone(region.words)
+
+    def test_source_normalization_is_independent_of_candidate_snapshots(
+        self,
+    ) -> None:
+        candidate = self._candidate()
+        aligner = alignment.TextAligner(
+            candidate_generator=_StaticCandidateGenerator((candidate,)),
+            candidate_selector=_AllCandidateSelector(),
+        )
+
+        result = aligner.align_data(_page("ALTO"), {"title": "Raw input"})
+        region = result.pages[0].regions[0]
+
+        self.assertEqual(region.input_text_normalized, "Raw input")
+        self.assertEqual(region.alto_text_normalized, "ALTO")
+        self.assertIs(region.text_alignment_candidate, candidate)
+        self.assertEqual(
+            region.text_alignment_candidate.normalized_query_text,
+            "candidate query",
+        )
+        self.assertEqual(
+            region.text_alignment_candidate.normalized_matched_text,
+            "candidate match",
+        )
+        self.assertEqual(region.words[0].text_normalized, "ALTO")
+
+    def test_selected_candidate_survives_failed_text_building(self) -> None:
+        candidate = self._candidate()
+        text_builder = mock.create_autospec(
+            alignment.TextBuilder,
+            instance=True,
+        )
+        text_builder.build.return_value = None
+        aligner = alignment.TextAligner(
+            candidate_generator=_StaticCandidateGenerator((candidate,)),
+            candidate_selector=_AllCandidateSelector(),
+            text_builder=text_builder,
+        )
+
+        result = aligner.align_data(_page("ALTO"), {"title": "Raw input"})
+        region = result.pages[0].regions[0]
+
+        self.assertIs(region.text_alignment_candidate, candidate)
+        self.assertEqual(region.input_text_normalized, "Raw input")
+        self.assertEqual(region.alto_text_normalized, "ALTO")
+        self.assertIsNone(region.alto_text)
+        self.assertIsNone(region.words)
+        self.assertFalse(region.matched)
 
 
 class GeometryBuilderTests(unittest.TestCase):
@@ -309,13 +434,13 @@ class GeometryBuilderTests(unittest.TestCase):
 
     def test_multiline_polygon_breaks_at_bottom_of_upper_line(self) -> None:
         words = (
-            alignment.OCRWord(
+            alignment.ALTOWord(
                 index=0,
                 text="FULL",
                 bbox=alignment.BoundingBox(0, 0, 100, 10),
                 line_index=0,
             ),
-            alignment.OCRWord(
+            alignment.ALTOWord(
                 index=1,
                 text="HALF",
                 bbox=alignment.BoundingBox(0, 12, 50, 10),
@@ -340,13 +465,13 @@ class GeometryBuilderTests(unittest.TestCase):
 
     def test_multiline_polygon_steps_on_both_sides(self) -> None:
         words = (
-            alignment.OCRWord(
+            alignment.ALTOWord(
                 index=0,
                 text="UPPER",
                 bbox=alignment.BoundingBox(20, 0, 80, 10),
                 line_index=0,
             ),
-            alignment.OCRWord(
+            alignment.ALTOWord(
                 index=1,
                 text="LOWER",
                 bbox=alignment.BoundingBox(0, 12, 50, 10),
@@ -373,13 +498,13 @@ class GeometryBuilderTests(unittest.TestCase):
 
     def test_each_edge_uses_its_own_inward_or_outward_break(self) -> None:
         words = (
-            alignment.OCRWord(
+            alignment.ALTOWord(
                 index=0,
                 text="UPPER",
                 bbox=alignment.BoundingBox(0, 0, 100, 10),
                 line_index=0,
             ),
-            alignment.OCRWord(
+            alignment.ALTOWord(
                 index=1,
                 text="LOWER",
                 bbox=alignment.BoundingBox(20, 12, 100, 10),
@@ -406,13 +531,13 @@ class GeometryBuilderTests(unittest.TestCase):
 
     def test_both_outward_edges_break_at_lower_line_top(self) -> None:
         words = (
-            alignment.OCRWord(
+            alignment.ALTOWord(
                 index=0,
                 text="UPPER",
                 bbox=alignment.BoundingBox(20, 0, 80, 10),
                 line_index=0,
             ),
-            alignment.OCRWord(
+            alignment.ALTOWord(
                 index=1,
                 text="LOWER",
                 bbox=alignment.BoundingBox(0, 12, 120, 10),
@@ -439,13 +564,13 @@ class GeometryBuilderTests(unittest.TestCase):
 
     def test_words_in_one_alto_line_become_one_clean_rectangle(self) -> None:
         words = (
-            alignment.OCRWord(
+            alignment.ALTOWord(
                 index=0,
                 text="FIRST",
                 bbox=alignment.BoundingBox(0, 1, 20, 9),
                 line_index=0,
             ),
-            alignment.OCRWord(
+            alignment.ALTOWord(
                 index=1,
                 text="SECOND",
                 bbox=alignment.BoundingBox(25, 0, 30, 10),
@@ -462,14 +587,14 @@ class GeometryBuilderTests(unittest.TestCase):
 
     def test_words_without_line_ids_retain_word_box_bands(self) -> None:
         words = (
-            alignment.OCRWord(
+            alignment.ALTOWord(
                 index=0,
                 text="FIRST",
                 bbox=alignment.BoundingBox(0, 1, 20, 9),
                 line_index=None,
                 block_index=0,
             ),
-            alignment.OCRWord(
+            alignment.ALTOWord(
                 index=1,
                 text="SECOND",
                 bbox=alignment.BoundingBox(25, 0, 30, 10),
@@ -495,14 +620,14 @@ class GeometryBuilderTests(unittest.TestCase):
 
     def test_equal_line_indexes_in_different_blocks_are_not_merged(self) -> None:
         words = (
-            alignment.OCRWord(
+            alignment.ALTOWord(
                 index=0,
                 text="UPPER",
                 bbox=alignment.BoundingBox(0, 0, 100, 10),
                 line_index=0,
                 block_index=0,
             ),
-            alignment.OCRWord(
+            alignment.ALTOWord(
                 index=1,
                 text="LOWER",
                 bbox=alignment.BoundingBox(0, 12, 50, 10),
@@ -528,14 +653,14 @@ class GeometryBuilderTests(unittest.TestCase):
 
     def test_ocr_line_splitting_does_not_split_a_visual_band(self) -> None:
         words = (
-            alignment.OCRWord(
+            alignment.ALTOWord(
                 index=0,
                 text="FIRST",
                 bbox=alignment.BoundingBox(0, 0, 20, 10),
                 line_index=4,
                 block_index=0,
             ),
-            alignment.OCRWord(
+            alignment.ALTOWord(
                 index=1,
                 text="SECOND",
                 bbox=alignment.BoundingBox(25, 0, 30, 10),
@@ -553,13 +678,13 @@ class GeometryBuilderTests(unittest.TestCase):
 
     def test_word_input_order_does_not_affect_polygon(self) -> None:
         words = (
-            alignment.OCRWord(
+            alignment.ALTOWord(
                 index=0,
                 text="UPPER",
                 bbox=alignment.BoundingBox(0, 0, 100, 10),
                 line_index=8,
             ),
-            alignment.OCRWord(
+            alignment.ALTOWord(
                 index=1,
                 text="LOWER",
                 bbox=alignment.BoundingBox(20, 12, 60, 10),
@@ -575,17 +700,17 @@ class GeometryBuilderTests(unittest.TestCase):
 
     def test_wide_narrow_wide_layout_retains_middle_concavity(self) -> None:
         words = (
-            alignment.OCRWord(
+            alignment.ALTOWord(
                 index=0,
                 text="WIDE",
                 bbox=alignment.BoundingBox(0, 0, 100, 10),
             ),
-            alignment.OCRWord(
+            alignment.ALTOWord(
                 index=1,
                 text="NARROW",
                 bbox=alignment.BoundingBox(0, 12, 50, 10),
             ),
-            alignment.OCRWord(
+            alignment.ALTOWord(
                 index=2,
                 text="WIDE",
                 bbox=alignment.BoundingBox(0, 24, 100, 10),
@@ -611,12 +736,12 @@ class GeometryBuilderTests(unittest.TestCase):
 
     def test_nonoverlapping_bands_are_connected_without_dropping_words(self) -> None:
         words = (
-            alignment.OCRWord(
+            alignment.ALTOWord(
                 index=0,
                 text="UPPER",
                 bbox=alignment.BoundingBox(0, 0, 20, 10),
             ),
-            alignment.OCRWord(
+            alignment.ALTOWord(
                 index=1,
                 text="LOWER",
                 bbox=alignment.BoundingBox(40, 12, 20, 10),
@@ -646,12 +771,12 @@ class GeometryBuilderTests(unittest.TestCase):
 
     def test_touching_disjoint_bands_fall_back_without_dropping_words(self) -> None:
         words = (
-            alignment.OCRWord(
+            alignment.ALTOWord(
                 index=0,
                 text="UPPER",
                 bbox=alignment.BoundingBox(0, 0, 20, 10),
             ),
-            alignment.OCRWord(
+            alignment.ALTOWord(
                 index=1,
                 text="LOWER",
                 bbox=alignment.BoundingBox(40, 10, 20, 10),
@@ -666,7 +791,7 @@ class GeometryBuilderTests(unittest.TestCase):
         )
 
     def test_degenerate_word_box_still_produces_closed_output(self) -> None:
-        word = alignment.OCRWord(
+        word = alignment.ALTOWord(
             index=0,
             text="POINT",
             bbox=alignment.BoundingBox(5, 7, 0, 0),
@@ -686,16 +811,16 @@ class GeometryBuilderTests(unittest.TestCase):
 
 class ListValueTests(unittest.TestCase):
     def test_extractor_exposes_each_scalar_list_element(self) -> None:
-        values = alignment.JSONTextExtractor().extract(
+        values = alignment.JSONTextExtractor().extract_alignment_region(
             {"publisher": ["First", "Second"]}
         )
 
         self.assertEqual(
-            [value.path for value in values],
+            [value.json_text_path for value in values],
             [("publisher", 0), ("publisher", 1)],
         )
         self.assertEqual(
-            [value.geometry_path for value in values],
+            [value.json_geometry_path for value in values],
             [("publisher_bbox", 0), ("publisher_bbox", 1)],
         )
 
@@ -710,17 +835,22 @@ class ListValueTests(unittest.TestCase):
             _page("FIRST", "SECOND"),
             {"publisher": ["First", "Second"]},
         )
+        output = _output(aligner, result)
 
-        self.assertEqual(result.output_data["publisher"], ["FIRST", "SECOND"])
+        self.assertEqual(output["publisher"], ["FIRST", "SECOND"])
         self.assertEqual(
-            result.output_data["publisher_bbox"],
+            output["publisher_bbox"],
             [
                 {"x": 0, "y": 0, "width": 9, "height": 10},
                 {"x": 10, "y": 0, "width": 9, "height": 10},
             ],
         )
         self.assertEqual(
-            [item.candidate.json_path for item in result.selected_alignments],
+            [
+                region.json_text_path
+                for region in result.pages[0].regions
+                if region.matched
+            ],
             [("publisher", 0), ("publisher", 1)],
         )
 
@@ -737,9 +867,8 @@ class ListValueTests(unittest.TestCase):
             "Praze.",
         )
         normalizer = alignment.TextNormalizationPipeline.from_optional_names()
-        preprocessor = alignment.AlignmentInputNormalizer(normalizer)
-        values = preprocessor.normalize_values(
-            alignment.JSONTextExtractor().extract(
+        regions = _normalize_regions(
+            alignment.JSONTextExtractor().extract_alignment_region(
                 {
                     "partNumber": "I.",
                     "placeTerm": "Praze.",
@@ -747,17 +876,18 @@ class ListValueTests(unittest.TestCase):
                         "ŠOLC a ŠIMÁČEK, společnost s r. o. v Praze."
                     ],
                 }
-            )
+            ),
+            normalizer,
         )
         candidates = alignment.ExactTextCandidateGenerator().generate(
-            values,
-            preprocessor.build_alto_index(page),
+            regions,
+            alignment.ALTOTextIndex(page, normalizer),
         )
 
         publisher_candidate = next(
             candidate
             for candidate in candidates
-            if candidate.json_path == ("publisher", 0)
+            if candidate.json_text_path == ("publisher", 0)
         )
         self.assertEqual(
             (publisher_candidate.start_word, publisher_candidate.end_word),
@@ -768,7 +898,7 @@ class ListValueTests(unittest.TestCase):
             next(
                 candidate.quality_chars
                 for candidate in candidates
-                if candidate.json_path == ("placeTerm",)
+                if candidate.json_text_path == ("placeTerm",)
             ),
         )
 
@@ -784,7 +914,7 @@ class ListValueTests(unittest.TestCase):
         )
 
         self.assertEqual(
-            result.output_data["publisher_bbox"],
+            _output(aligner, result)["publisher_bbox"],
             [{"x": 0, "y": 0, "width": 9, "height": 10}, None],
         )
 
@@ -799,29 +929,36 @@ class ListValueTests(unittest.TestCase):
             _page("FIRST", "SECOND"),
             {"publisher": ["First", "Second"]},
         )
+        output = _output(aligner, result)
 
         self.assertEqual(
-            result.output_data["publisher_polygon"],
+            output["publisher_polygon"],
             [
                 [[0, 0], [9, 0], [9, 10], [0, 10], [0, 0]],
                 [[10, 0], [19, 0], [19, 10], [10, 10], [10, 0]],
             ],
         )
-        self.assertNotIn("publisher_bbox", result.output_data)
+        self.assertNotIn("publisher_bbox", output)
 
 
-class JSONGeometryMergerTests(unittest.TestCase):
+class AlignmentJSONExporterTests(unittest.TestCase):
     def test_reconstructs_nested_output_from_retained_paths(self) -> None:
         input_data = {"groups": [{"names": ["Original"]}]}
-        value = alignment.JSONTextExtractor().extract(input_data)[0]
-        writer = alignment.JSONGeometryMerger()
-
-        output_data = writer.create_output(input_data, (value,))
-        writer.set_aligned_text(output_data, value, "ALTO")
-        writer.set_geometry(
-            output_data,
-            value,
-            {"x": 1, "y": 2, "width": 3, "height": 4},
+        page = alignment.JSONTextExtractor().extract_alignment_page(
+            input_data,
+            page_key="page",
+        )
+        region = page.regions[0]
+        region.alto_text = "ALTO"
+        region.alto_geometry = alignment.BoundingBox(1, 2, 3, 4)
+        output_data = alignment.AlignmentJSONExporter(
+            alignment_mode=alignment.AlignmentMode.TEXT,
+            geometry_suffix="_bbox",
+            output_geometry_format=alignment.OutputGeometryFormat.BBOX,
+            output_text_source=alignment.OutputTextSource.ALTO,
+            output_geometry_source=alignment.OutputGeometrySource.ALTO,
+        ).export(
+            page,
         )
 
         self.assertEqual(input_data, {"groups": [{"names": ["Original"]}]})
@@ -844,7 +981,7 @@ class PolygonOutputTests(unittest.TestCase):
     def _align(
         self,
         geometry_suffix: str | None = None,
-    ) -> alignment.TextAlignmentResult:
+    ):
         aligner = alignment.TextAligner(
             geometry_suffix=geometry_suffix,
             output_geometry_format=alignment.OutputGeometryFormat.POLYGON,
@@ -852,39 +989,45 @@ class PolygonOutputTests(unittest.TestCase):
             candidate_selector=_AllCandidateSelector(),
             normalizer=_lowercase_normalizer(),
         )
-        return aligner.align_data(
-            _page("FIRST", "SECOND"),
-            {"title": "First Second"},
+        return (
+            aligner,
+            aligner.align_data(
+                _page("FIRST", "SECOND"),
+                {"title": "First Second"},
+            ),
         )
 
     def test_polygon_format_selects_builder_suffix_and_result_metadata(self) -> None:
-        result = self._align()
+        aligner, result = self._align()
+        output = _output(aligner, result)
+        region = result.pages[0].regions[0]
 
         self.assertEqual(
-            result.output_data["title_polygon"],
+            output["title_polygon"],
             [[0, 0], [19, 0], [19, 10], [0, 10], [0, 0]],
         )
-        self.assertNotIn("title_bbox", result.output_data)
+        self.assertNotIn("title_bbox", output)
         self.assertIs(
-            result.output_geometry_format,
+            aligner.output_geometry_format,
             alignment.OutputGeometryFormat.POLYGON,
         )
         self.assertIsInstance(
-            result.selected_alignments[0].geometry,
+            region.alto_geometry,
             alignment.Polygon,
         )
 
     def test_explicit_geometry_suffix_overrides_format_default(self) -> None:
-        result = self._align("_shape")
+        aligner, result = self._align("_shape")
+        output = _output(aligner, result)
 
-        self.assertIn("title_shape", result.output_data)
-        self.assertNotIn("title_polygon", result.output_data)
+        self.assertIn("title_shape", output)
+        self.assertNotIn("title_polygon", output)
 
     def test_extractor_ignores_geometry_from_both_formats(self) -> None:
         values = alignment.JSONTextExtractor(
             geometry_suffix="_polygon",
             overwrite_existing_geometry=True,
-        ).extract(
+        ).extract_alignment_region(
             {
                 "title": "Rome",
                 "title_bbox": {
@@ -897,7 +1040,10 @@ class PolygonOutputTests(unittest.TestCase):
             }
         )
 
-        self.assertEqual([value.path for value in values], [("title",)])
+        self.assertEqual(
+            [value.json_text_path for value in values],
+            [("title",)],
+        )
 
     def test_existing_bbox_is_retained_when_polygon_is_added(self) -> None:
         existing_bbox = {"x": 1, "y": 2, "width": 3, "height": 4}
@@ -912,9 +1058,10 @@ class PolygonOutputTests(unittest.TestCase):
             _page("ROME"),
             {"title": "Rome", "title_bbox": existing_bbox},
         )
+        output = _output(aligner, result)
 
-        self.assertEqual(result.output_data["title_bbox"], existing_bbox)
-        self.assertIn("title_polygon", result.output_data)
+        self.assertEqual(output["title_bbox"], existing_bbox)
+        self.assertIn("title_polygon", output)
 
     def test_existing_geometry_is_preserved_by_default(self) -> None:
         existing_polygon = [[1, 2], [4, 2], [1, 2]]
@@ -930,7 +1077,7 @@ class PolygonOutputTests(unittest.TestCase):
         )
 
         self.assertEqual(
-            result.output_data["title_polygon"],
+            _output(aligner, result)["title_polygon"],
             existing_polygon,
         )
         self.assertEqual(result.matched_count, 0)
@@ -952,7 +1099,7 @@ class PolygonOutputTests(unittest.TestCase):
         )
 
         self.assertEqual(
-            result.output_data["title_polygon"],
+            _output(aligner, result)["title_polygon"],
             [[0, 0], [9, 0], [9, 10], [0, 10], [0, 0]],
         )
         self.assertEqual(result.matched_count, 1)
@@ -1181,12 +1328,12 @@ class FuzzyCandidateTests(unittest.TestCase):
         short_exact = next(
             candidate
             for candidate in candidates
-            if candidate.value_id == 0 and candidate.exact
+            if candidate.region_id == 0 and candidate.exact
         )
         long_fuzzy = next(
             candidate
             for candidate in candidates
-            if candidate.value_id == 1
+            if candidate.region_id == 1
             and (candidate.start_word, candidate.end_word) == (0, 2)
         )
         self.assertGreater(long_fuzzy.quality_chars, short_exact.quality_chars)
@@ -1237,13 +1384,13 @@ class OrderedAlignmentCandidateTests(unittest.TestCase):
 
     def _generate(
         self,
-        values: tuple[alignment.JSONScalarValue, ...],
+        regions: tuple[alignment.AlignmentRegion, ...],
         page: alignment.ALTOPage,
         config: alignment.OrderedAlignmentCandidateConfig | None = None,
     ) -> tuple[alignment.AlignmentCandidate, ...]:
         generator = alignment.OrderedAlignmentCandidateGenerator(config)
         index = alignment.ALTOTextIndex(page, self.normalizer)
-        return generator.generate(values, index)
+        return generator.generate(regions, index)
 
     def test_one_global_alignment_maps_values_in_reading_order(self) -> None:
         candidates = self._generate(
@@ -1258,7 +1405,7 @@ class OrderedAlignmentCandidateTests(unittest.TestCase):
         self.assertEqual(
             [
                 (
-                    candidate.value_id,
+                    candidate.region_id,
                     candidate.start_word,
                     candidate.end_word,
                 )
@@ -1282,7 +1429,7 @@ class OrderedAlignmentCandidateTests(unittest.TestCase):
 
         self.assertEqual(
             [
-                (candidate.value_id, candidate.start_word)
+                (candidate.region_id, candidate.start_word)
                 for candidate in candidates
             ],
             [(0, 0), (1, 1)],
@@ -1297,7 +1444,7 @@ class OrderedAlignmentCandidateTests(unittest.TestCase):
         )
 
         self.assertEqual(len(candidates), 1)
-        self.assertEqual(candidates[0].value_id, 1)
+        self.assertEqual(candidates[0].region_id, 1)
         self.assertEqual(candidates[0].start_word, 1)
 
     def test_fuzzy_value_uses_the_shared_boundary_tolerances(self) -> None:
@@ -1354,15 +1501,16 @@ class OrderedAlignmentCandidateTests(unittest.TestCase):
         )
 
         self.assertEqual(result.matched_count, 2)
+        output = _output(aligner, result)
         self.assertEqual(
-            result.output_data["nested"]["cities_bbox"],
+            output["nested"]["cities_bbox"],
             [
                 {"x": 0, "y": 0, "width": 9, "height": 10},
                 None,
             ],
         )
         self.assertEqual(
-            result.output_data["nested"]["cities"][1]["name_bbox"],
+            output["nested"]["cities"][1]["name_bbox"],
             {"x": 10, "y": 0, "width": 9, "height": 10},
         )
 
@@ -1437,7 +1585,7 @@ class OutputTextSourceTests(unittest.TestCase):
     def _align(
         self,
         output_text_source: alignment.OutputTextSource | str | None = None,
-    ) -> alignment.TextAlignmentResult:
+    ):
         kwargs = {}
         if output_text_source is not None:
             kwargs["output_text_source"] = output_text_source
@@ -1447,38 +1595,55 @@ class OutputTextSourceTests(unittest.TestCase):
             normalizer=_lowercase_normalizer(),
             **kwargs,
         )
-        return aligner.align_data(_page("ROME"), {"title": "Rome"})
+        return (
+            aligner,
+            aligner.align_data(_page("ROME"), {"title": "Rome"}),
+        )
 
     def test_json_is_the_default_output_and_rendering_text_source(self) -> None:
-        result = self._align()
-        selected = result.selected_alignments[0]
+        aligner, result = self._align()
+        page = result.pages[0]
+        region = page.regions[0]
+        rendered = alignment.PillowAlignmentRenderer._render_alignments(
+            page,
+            aligner.render_text_source,
+            aligner.render_geometry_source,
+            aligner.render_geometry_format,
+        )
 
-        self.assertEqual(result.output_data["title"], "Rome")
+        self.assertEqual(_output(aligner, result)["title"], "Rome")
         self.assertIs(
-            result.output_text_source,
+            aligner.output_text_source,
             alignment.OutputTextSource.JSON,
         )
-        self.assertEqual(result.text_for_alignment(selected), "Rome")
+        self.assertEqual(region.input_text, "Rome")
+        self.assertEqual(region.alto_text, "ROME")
         self.assertEqual(
             alignment.PillowAlignmentRenderer()._build_label(
-                result.render_alignments[0]
+                rendered[0]
             ),
             "Rome [1.00]",
         )
 
     def test_alto_source_updates_output_and_rendering_text(self) -> None:
-        result = self._align(alignment.OutputTextSource.ALTO)
-        selected = result.selected_alignments[0]
+        aligner, result = self._align(alignment.OutputTextSource.ALTO)
+        page = result.pages[0]
+        rendered = alignment.PillowAlignmentRenderer._render_alignments(
+            page,
+            aligner.render_text_source,
+            aligner.render_geometry_source,
+            aligner.render_geometry_format,
+        )
 
-        self.assertEqual(result.output_data["title"], "ROME")
+        self.assertEqual(_output(aligner, result)["title"], "ROME")
         self.assertIs(
-            result.output_text_source,
+            aligner.output_text_source,
             alignment.OutputTextSource.ALTO,
         )
-        self.assertEqual(result.text_for_alignment(selected), "ROME")
+        self.assertEqual(page.regions[0].alto_text, "ROME")
         self.assertEqual(
             alignment.PillowAlignmentRenderer()._build_label(
-                result.render_alignments[0]
+                rendered[0]
             ),
             "ROME [1.00]",
         )
@@ -1517,14 +1682,14 @@ class CPSATSelectionTests(unittest.TestCase):
 
     def test_long_near_exact_phrase_beats_short_exact_substring(self) -> None:
         normalizer = _lowercase_normalizer()
-        preprocessor = alignment.AlignmentInputNormalizer(normalizer)
-        values = preprocessor.normalize_values(
-            (
-                _value(0, "Rome"),
-                _value(1, "Library of Reme"),
-            )
+        regions = (
+            _value(0, "Rome"),
+            _value(1, "Library of Reme"),
         )
-        index = preprocessor.build_alto_index(_page("Library", "of", "Rome"))
+        index = alignment.ALTOTextIndex(
+            _page("Library", "of", "Rome"),
+            normalizer,
+        )
 
         with mock.patch.object(
             candidate_generation,
@@ -1532,13 +1697,16 @@ class CPSATSelectionTests(unittest.TestCase):
             return_value=_distance,
         ):
             candidates = _combined_generator().generate(
-                values,
+                regions,
                 index,
             )
-        selected = alignment.CPSATCandidateSelector().select(candidates, values)
+        selected = alignment.CPSATCandidateSelector().select(
+            candidates,
+            regions,
+        )
 
         self.assertEqual(len(selected), 1)
-        self.assertEqual(selected[0].value_id, 1)
+        self.assertEqual(selected[0].region_id, 1)
         self.assertEqual((selected[0].start_word, selected[0].end_word), (0, 2))
         self.assertFalse(selected[0].exact)
 
@@ -1549,6 +1717,26 @@ class ArgumentParserTests(unittest.TestCase):
             alignment.TextAligner.__module__,
             "text_geometry_aligner.text_aligner",
         )
+
+    def test_specific_models_live_with_their_processing_domain(self) -> None:
+        self.assertEqual(
+            alignment.ALTOWord.__module__,
+            "text_geometry_aligner.alto_io.reader",
+        )
+        self.assertEqual(
+            alignment.ALTOPage.__module__,
+            "text_geometry_aligner.alto_io.reader",
+        )
+        self.assertFalse(hasattr(alignment, "OCRWord"))
+        self.assertEqual(
+            alignment.AlignmentCandidate.__module__,
+            "text_geometry_aligner.text_matching.candidate",
+        )
+        self.assertEqual(
+            alignment.ALTOWordSpan.__module__,
+            "text_geometry_aligner.alto_processing.text_index",
+        )
+        self.assertFalse(hasattr(alignment, "OCRWordSpan"))
 
     def test_io_and_processing_apis_have_no_compatibility_aliases(self) -> None:
         self.assertEqual(
@@ -1572,11 +1760,21 @@ class ArgumentParserTests(unittest.TestCase):
             "text_geometry_aligner.json_processing.text_extractor",
         )
         self.assertEqual(
-            alignment.JSONGeometryMerger.__module__,
-            "text_geometry_aligner.json_processing.geometry_merger",
+            alignment.AlignmentJSONExporter.__module__,
+            "text_geometry_aligner.json_processing.alignment_exporter",
         )
+        self.assertFalse(hasattr(alignment, "JSONGeometryMerger"))
+        self.assertFalse(hasattr(alignment, "JSONTextMerger"))
         self.assertFalse(hasattr(alignment, "ALTOParser"))
         self.assertFalse(hasattr(alignment, "JSONValueWriter"))
+        self.assertFalse(hasattr(alignment, "AlignmentInputNormalizer"))
+        self.assertFalse(hasattr(alignment, "PreparedTextRegion"))
+        self.assertFalse(hasattr(alignment, "StrictTextNormalizer"))
+        self.assertIsNone(
+            importlib.util.find_spec(
+                "text_geometry_aligner.preprocessing"
+            )
+        )
         self.assertIsNone(
             importlib.util.find_spec(
                 "text_geometry_aligner.alto"
@@ -1679,7 +1877,9 @@ class ArgumentParserTests(unittest.TestCase):
         }
         self.assertIn("--text-normalizer", option_strings)
         self.assertIn("--output-text-source", option_strings)
-        self.assertIn("--output-geometry-format", option_strings)
+        self.assertIn("--output-alto-text-format", option_strings)
+        self.assertIn("--output-alto-geometry-format", option_strings)
+        self.assertNotIn("--output-geometry-format", option_strings)
         self.assertIn("--candidate-generator", option_strings)
         self.assertIn("--candidate-selector", option_strings)
         self.assertIn("--overwrite-existing-geometry", option_strings)
@@ -1693,7 +1893,7 @@ class ArgumentParserTests(unittest.TestCase):
         required_arguments = [
             "--alto-dir",
             "alto",
-            "--json-input-dir",
+            "--input-dir",
             "json",
             "--json-output-dir",
             "output",
@@ -1703,7 +1903,11 @@ class ArgumentParserTests(unittest.TestCase):
             [*required_arguments, "--output-text-source", "alto"]
         )
         polygon_args = parser.parse_args(
-            [*required_arguments, "--output-geometry-format", "polygon"]
+            [
+                *required_arguments,
+                "--output-alto-geometry-format",
+                "polygon",
+            ]
         )
         exact_args = parser.parse_args(
             [*required_arguments, "--candidate-generator", "exact"]
@@ -1730,14 +1934,24 @@ class ArgumentParserTests(unittest.TestCase):
             [*required_arguments, "--overwrite-existing-geometry"]
         )
         self.assertEqual(default_args.output_text_source, "json")
-        self.assertEqual(default_args.output_geometry_format, "bbox")
+        self.assertEqual(
+            default_args.output_alto_text_format,
+            "space-separated",
+        )
+        self.assertEqual(
+            default_args.output_alto_geometry_format,
+            "bbox",
+        )
         self.assertEqual(default_args.candidate_generator, "combined")
         self.assertEqual(default_args.candidate_selector, "cp-sat")
         self.assertIsNone(default_args.text_normalizer)
         self.assertIsNone(default_args.geometry_suffix)
         self.assertFalse(default_args.overwrite_existing_geometry)
         self.assertEqual(alto_args.output_text_source, "alto")
-        self.assertEqual(polygon_args.output_geometry_format, "polygon")
+        self.assertEqual(
+            polygon_args.output_alto_geometry_format,
+            "polygon",
+        )
         self.assertEqual(exact_args.candidate_generator, "exact")
         self.assertEqual(
             ordered_args.candidate_generator,
@@ -1763,7 +1977,7 @@ class ArgumentParserTests(unittest.TestCase):
         required_arguments = [
             "--alto-dir",
             "alto",
-            "--json-input-dir",
+            "--input-dir",
             "json",
             "--json-output-dir",
             "output",
@@ -1793,6 +2007,14 @@ class ArgumentParserTests(unittest.TestCase):
         ordered = aligner_module._build_candidate_generator(ordered_args)
         cp_sat = aligner_module._build_candidate_selector(combined_args)
         pass_through = aligner_module._build_candidate_selector(ordered_args)
+        text_builder = base_aligner_module._build_text_builder(
+            combined_args.output_alto_text_format
+        )
+        geometry_builder = base_aligner_module._build_geometry_builder(
+            alignment.OutputGeometryFormat(
+                combined_args.output_alto_geometry_format
+            )
+        )
 
         self.assertIsInstance(exact, alignment.ExactTextCandidateGenerator)
         self.assertIsInstance(combined, alignment.CompositeCandidateGenerator)
@@ -1804,6 +2026,14 @@ class ArgumentParserTests(unittest.TestCase):
         self.assertIsInstance(
             pass_through,
             alignment.PassThroughCandidateSelector,
+        )
+        self.assertIsInstance(
+            text_builder,
+            alignment.SpaceSeparatedTextBuilder,
+        )
+        self.assertIsInstance(
+            geometry_builder,
+            alignment.UnionBoundingBoxGeometryBuilder,
         )
         self.assertEqual(
             [type(generator) for generator in combined.generators],

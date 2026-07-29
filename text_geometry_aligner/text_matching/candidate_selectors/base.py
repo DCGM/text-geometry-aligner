@@ -5,7 +5,8 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Sequence
 
-from ...models import AlignmentCandidate, JSONScalarValue
+from ...models import AlignmentRegion
+from ..candidate import AlignmentCandidate
 
 
 class CandidateSelector(ABC):
@@ -15,6 +16,6 @@ class CandidateSelector(ABC):
     def select(
         self,
         candidates: Sequence[AlignmentCandidate],
-        values: Sequence[JSONScalarValue],
+        regions: Sequence[AlignmentRegion],
     ) -> tuple[AlignmentCandidate, ...]:
         raise NotImplementedError

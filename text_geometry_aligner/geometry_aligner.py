@@ -1,17 +1,23 @@
 #!/usr/bin/env python3
-"""Geometry-to-text alignment orchestration and command-line entry point."""
+"""Geometry-to-text alignment orchestration and CLI."""
 
 from __future__ import annotations
 
 import argparse
 import logging
-from typing import Any, Optional
+from pathlib import Path
+from typing import Any
 
-from text_geometry_aligner.alto_io import ALTOReader
+import text_geometry_aligner.base_aligner as base_aligner_module
+from text_geometry_aligner.alto_io import ALTOPage, ALTOReader
 from text_geometry_aligner.base_aligner import (
     BaseAligner,
     add_common_cli_arguments,
     validate_common_cli_arguments,
+)
+from text_geometry_aligner.geometry_building import (
+    GeometryBuilder,
+    validate_geometry_format,
 )
 from text_geometry_aligner.geometry_matching import (
     GeometryOverlapCalculator,
@@ -20,41 +26,38 @@ from text_geometry_aligner.geometry_matching import (
     create_overlap_calculator,
     create_word_assigner,
 )
-from text_geometry_aligner.json_io import (
-    JSONReader,
-    JSONWriter,
-)
+from text_geometry_aligner.json_io import JSONReader, JSONWriter
 from text_geometry_aligner.json_processing import (
+    AlignmentJSONExporter,
     JSONGeometryExtractor,
-    JSONTextMerger,
 )
 from text_geometry_aligner.models import (
-    ALTOPage,
-    GeometryAlignmentResult,
+    AlignmentDocument,
+    AlignmentMode,
+    AlignmentPage,
+    AlignmentWord,
+    InputFormat,
+    OutputGeometryFormat,
+    OutputGeometrySource,
+    OutputTextSource,
 )
 from text_geometry_aligner.rendering import AlignmentRenderer
 from text_geometry_aligner.text_building import (
-    SpaceSeparatedTextBuilder,
     TextBuilder,
 )
 from text_geometry_aligner.utils import (
     _format_json_path,
     _parse_logging_level,
 )
+from text_geometry_aligner.yolo_processing import YOLOGeometryExtractor
 
 logger = logging.getLogger(__name__)
 
-TEXT_BUILDER_CHOICES = ("space-separated",)
+class GeometryAligner(BaseAligner):
+    """Align input geometry to ALTO and enrich the shared hierarchy."""
 
-
-def _build_text_builder(name: str) -> TextBuilder:
-    if name == "space-separated":
-        return SpaceSeparatedTextBuilder()
-    raise ValueError(f"Unsupported text builder: {name}")
-
-
-class GeometryAligner(BaseAligner[GeometryAlignmentResult]):
-    """Extract ALTO text using geometry supplied by JSON."""
+    alignment_mode = AlignmentMode.GEOMETRY
+    supported_input_formats = (InputFormat.JSON, InputFormat.YOLO)
 
     def __init__(
         self,
@@ -65,13 +68,21 @@ class GeometryAligner(BaseAligner[GeometryAlignmentResult]):
             WordAssignmentStrategy.GREATEST_COVERAGE
         ),
         overwrite_existing_text: bool = False,
-        overlap_calculator: Optional[GeometryOverlapCalculator] = None,
-        word_assigner: Optional[GeometryWordAssigner] = None,
-        text_builder: Optional[TextBuilder] = None,
-        alto_reader: Optional[ALTOReader] = None,
-        json_reader: Optional[JSONReader] = None,
-        json_writer: Optional[JSONWriter] = None,
-        renderer: Optional[AlignmentRenderer] = None,
+        output_geometry_source: OutputGeometrySource | str = (
+            OutputGeometrySource.INPUT
+        ),
+        output_geometry_format: OutputGeometryFormat | str = (
+            OutputGeometryFormat.BBOX
+        ),
+        overlap_calculator: GeometryOverlapCalculator | None = None,
+        word_assigner: GeometryWordAssigner | None = None,
+        text_builder: TextBuilder | None = None,
+        geometry_builder: GeometryBuilder | None = None,
+        alto_reader: ALTOReader | None = None,
+        json_reader: JSONReader | None = None,
+        json_writer: JSONWriter | None = None,
+        renderer: AlignmentRenderer | None = None,
+        yolo_extractor: YOLOGeometryExtractor | None = None,
     ):
         if not geometry_suffix:
             raise ValueError("geometry_suffix must not be empty")
@@ -79,147 +90,214 @@ class GeometryAligner(BaseAligner[GeometryAlignmentResult]):
             raise ValueError(
                 "minimum_word_coverage must be within [0, 1]"
             )
-        parsed_assignment_strategy = WordAssignmentStrategy(
-            word_assignment_strategy
-        )
-        if word_assigner is not None and text_builder is not None:
-            raise ValueError(
-                "text_builder cannot be combined with word_assigner"
-            )
-
         super().__init__(
             alto_reader=alto_reader,
-            json_reader=json_reader,
             json_writer=json_writer,
+            output_geometry_format=output_geometry_format,
+            geometry_builder=geometry_builder,
+            text_builder=text_builder,
             renderer=renderer,
         )
+        self.json_reader = json_reader or JSONReader()
         self.geometry_suffix = geometry_suffix
         self.minimum_word_coverage = minimum_word_coverage
         self.overwrite_existing_text = overwrite_existing_text
+        self.output_geometry_source = OutputGeometrySource(
+            output_geometry_source
+        )
         self.overlap_calculator = overlap_calculator
-        self.word_assignment_strategy = parsed_assignment_strategy
-        resolved_text_builder = text_builder or _build_text_builder(
-            "space-separated"
+        self.word_assignment_strategy = WordAssignmentStrategy(
+            word_assignment_strategy
         )
         self.word_assigner = word_assigner or create_word_assigner(
-            parsed_assignment_strategy,
-            text_builder=resolved_text_builder,
+            self.word_assignment_strategy
         )
-        self.geometry_extractor = JSONGeometryExtractor(
+        self.json_extractor = JSONGeometryExtractor(
             geometry_suffix=geometry_suffix,
             overwrite_existing_text=overwrite_existing_text,
         )
-        self.text_merger = JSONTextMerger(
+        self.yolo_extractor = yolo_extractor or YOLOGeometryExtractor()
+        self.json_exporter = AlignmentJSONExporter(
+            alignment_mode=self.alignment_mode,
             geometry_suffix=geometry_suffix,
-            overwrite_existing_text=overwrite_existing_text
+            output_geometry_format=self.output_geometry_format,
+            output_text_source=OutputTextSource.ALTO,
+            output_geometry_source=self.output_geometry_source,
+        )
+
+    @property
+    def render_text_source(self) -> OutputTextSource:
+        return OutputTextSource.ALTO
+
+    @property
+    def render_geometry_source(self) -> OutputGeometrySource:
+        return self.output_geometry_source
+
+    def read_input_page(
+        self,
+        input_file: Path,
+        input_format: InputFormat,
+        page_key: str,
+    ) -> AlignmentPage:
+        if input_format is InputFormat.YOLO:
+            return self.yolo_extractor.extract_alignment_page(
+                input_file,
+                page_key=page_key,
+            )
+        return self.json_extractor.extract_alignment_page(
+            self.json_reader.read(input_file),
+            page_key=page_key,
+            input_file_path=input_file,
         )
 
     def align_data(
         self,
         alto_page: ALTOPage,
         input_data: Any,
-    ) -> GeometryAlignmentResult:
-        regions = self.geometry_extractor.extract(input_data)
-        output_data = self.text_merger.create_output(input_data)
-        if regions:
-            calculator = self.overlap_calculator or create_overlap_calculator(
-                regions
-            )
-            coverages = calculator.calculate(
-                regions,
-                alto_page.words,
-                self.minimum_word_coverage,
-            )
-            alignments = self.word_assigner.assign(
-                regions,
-                alto_page.words,
-                coverages,
-            )
-        else:
-            alignments = ()
+    ) -> AlignmentDocument:
+        """Align loaded geometry JSON and return a one-page document."""
 
-        for alignment in alignments:
-            self.text_merger.set_text(
-                output_data,
-                alignment.region.text_path,
-                alignment.extracted_text,
+        page = self.json_extractor.extract_alignment_page(
+            input_data,
+            page_key="page",
+        )
+        page.alto_file_path = alto_page.source_path
+        page.alto_page_id = alto_page.page_id
+        page.alto_width = alto_page.width
+        page.alto_height = alto_page.height
+        self.align_page(alto_page, page)
+        return AlignmentDocument(
+            alignment_mode=self.alignment_mode,
+            pages=[page],
+        )
+
+    def align_page(
+        self,
+        alto_page: ALTOPage,
+        page: AlignmentPage,
+    ) -> AlignmentPage:
+        regions = page.regions
+        if not regions:
+            return page
+        calculator = self.overlap_calculator or create_overlap_calculator(
+            regions
+        )
+        coverages = calculator.calculate(
+            regions,
+            alto_page.words,
+            self.minimum_word_coverage,
+        )
+        assignments = self.word_assigner.assign(
+            regions,
+            alto_page.words,
+            coverages,
+        )
+        regions_by_id = {
+            region.region_id: region for region in regions
+        }
+        words_by_index = {
+            word.index: word for word in alto_page.words
+        }
+
+        for assignment in assignments:
+            region = regions_by_id[assignment.region_id]
+            words = tuple(
+                words_by_index[index]
+                for index in assignment.word_indexes
             )
-            if alignment.extracted_text is None:
+            if words:
+                if len(assignment.word_coverages) != len(words):
+                    raise ValueError(
+                        "word coverages and assigned words must have the "
+                        "same length"
+                    )
+
+                alto_text = self.text_builder.build(words)
+                if alto_text is not None:
+                    region.words = [
+                        AlignmentWord(
+                            word_index=word.index,
+                            text=word.text,
+                            bbox=word.bbox,
+                            coverage=assignment.word_coverages[index],
+                            line_index=word.line_index,
+                            block_index=word.block_index,
+                            element_id=word.element_id,
+                        )
+                        for index, word in enumerate(words)
+                    ]
+                    region.alto_text = alto_text
+                    alto_geometry = self.geometry_builder.build(words)
+                    validate_geometry_format(
+                        alto_geometry,
+                        self.output_geometry_format,
+                    )
+                    region.alto_geometry = alto_geometry
+                    region.alignment_score = (
+                        sum(assignment.word_coverages)
+                        / len(assignment.word_coverages)
+                    )
+            if not region.matched:
                 logger.warning(
                     "No ALTO words matched geometry at %s",
-                    _format_json_path(alignment.region.geometry_path),
+                    _format_json_path(region.json_geometry_path or ()),
                 )
-            else:
-                logger.info(
-                    "Matched geometry %s to %d words (%r), average "
-                    "coverage=%.4f",
-                    _format_json_path(alignment.region.geometry_path),
-                    len(alignment.word_indexes),
-                    alignment.extracted_text,
-                    alignment.average_coverage,
-                )
+                continue
+            logger.info(
+                "Matched geometry %s to %d words (%r), average "
+                "coverage=%.4f",
+                _format_json_path(region.json_geometry_path or ()),
+                len(region.words or ()),
+                region.alto_text,
+                region.alignment_score or 0.0,
+            )
 
-        result = GeometryAlignmentResult(
-            output_data=output_data,
-            regions=regions,
-            alignments=alignments,
-        )
         logger.info(
             "Geometry alignment summary: regions=%d matched=%d unmatched=%d",
             len(regions),
-            result.matched_count,
-            result.unmatched_count,
+            page.matched_count,
+            page.unmatched_count,
         )
-        return result
+        return page
 
+    def export_page(self, page: AlignmentPage) -> dict[str, object]:
+        return self.json_exporter.export(page)
 
 def build_argument_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description=(
-            "Extract ALTO text into JSON values selected by parallel geometry."
-        )
+        description="Extract ALTO text using JSON or YOLO geometry."
     )
-    add_common_cli_arguments(parser)
+    add_common_cli_arguments(
+        parser,
+        input_formats=GeometryAligner.supported_input_formats,
+    )
     parser.add_argument(
         "--geometry-suffix",
         default="_bbox",
-        help="Suffix identifying geometry keys (default: _bbox)",
+        help="Suffix identifying geometry keys in JSON input",
     )
     parser.add_argument(
         "--minimum-word-coverage",
         type=float,
         default=0.65,
-        help=(
-            "Minimum fraction of an ALTO word area covered by a region "
-            "(default: 0.65)"
-        ),
+        help="Minimum covered fraction of an ALTO word (default: 0.65)",
     )
     parser.add_argument(
         "--word-assignment-strategy",
-        choices=tuple(strategy.value for strategy in WordAssignmentStrategy),
+        choices=tuple(item.value for item in WordAssignmentStrategy),
         default=WordAssignmentStrategy.GREATEST_COVERAGE.value,
-        help=(
-            "Resolve words covered by multiple regions using the greatest "
-            "coverage winner or retain all eligible assignments "
-            "(default: greatest-coverage)"
-        ),
+        help="Shared-word resolution strategy",
     )
     parser.add_argument(
-        "--text-builder",
-        choices=TEXT_BUILDER_CHOICES,
-        default="space-separated",
-        help=(
-            "Construct output text by joining matched ALTO words with spaces "
-            "(default: space-separated)"
-        ),
+        "--output-geometry-source",
+        choices=tuple(item.value for item in OutputGeometrySource),
+        default=OutputGeometrySource.INPUT.value,
+        help="Use input or ALTO-derived geometry (default: input)",
     )
     parser.add_argument(
         "--overwrite-existing-text",
         action="store_true",
-        help=(
-            "Process and replace destinations that already exist; by default "
-            "their geometries are skipped before matching"
-        ),
+        help="Process and replace existing JSON text destinations",
     )
     parser.add_argument(
         "--logging-level",
@@ -234,28 +312,33 @@ def main() -> None:
     parser = build_argument_parser()
     args = parser.parse_args()
     validate_common_cli_arguments(parser, args)
-
     logging.basicConfig(
         level=args.logging_level,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
-
     try:
-        text_builder = _build_text_builder(args.text_builder)
         aligner = GeometryAligner(
             geometry_suffix=args.geometry_suffix,
             minimum_word_coverage=args.minimum_word_coverage,
             word_assignment_strategy=args.word_assignment_strategy,
             overwrite_existing_text=args.overwrite_existing_text,
-            text_builder=text_builder,
+            output_geometry_source=args.output_geometry_source,
+            output_geometry_format=args.output_alto_geometry_format,
+            text_builder=base_aligner_module._build_text_builder(
+                args.output_alto_text_format
+            ),
+            geometry_builder=base_aligner_module._build_geometry_builder(
+                OutputGeometryFormat(args.output_alto_geometry_format)
+            ),
         )
     except ValueError as exc:
         parser.error(str(exc))
 
     aligner.process_directories(
         alto_input_dir=args.alto_dir,
-        json_input_dir=args.json_input_dir,
+        input_dir=args.input_dir,
         json_output_dir=args.json_output_dir,
+        input_format=args.input_format,
         images_input_dir=args.images_dir,
         render_output_dir=args.render_dir,
         fail_on_missing_alto=args.fail_on_missing_alto,

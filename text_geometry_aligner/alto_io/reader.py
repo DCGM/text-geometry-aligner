@@ -3,12 +3,36 @@ from __future__ import annotations
 import logging
 import os
 import xml.etree.ElementTree as ET
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-from ..models import ALTOPage, BoundingBox, OCRWord
+from ..models import BoundingBox
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class ALTOWord:
+    """One ALTO ``String`` element in document order."""
+
+    index: int
+    text: str
+    bbox: BoundingBox
+    line_index: Optional[int] = None
+    block_index: Optional[int] = None
+    element_id: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class ALTOPage:
+    """One ALTO page parsed for alignment."""
+
+    source_path: Path
+    words: tuple[ALTOWord, ...]
+    page_id: Optional[str] = None
+    width: Optional[float] = None
+    height: Optional[float] = None
 
 
 class ALTOReader:
@@ -33,13 +57,17 @@ class ALTOReader:
         page_width = _optional_float(page_element, "WIDTH")
         page_height = _optional_float(page_element, "HEIGHT")
 
-        words: list[OCRWord] = []
+        words: list[ALTOWord] = []
         block_index = -1
         line_index = -1
 
         # Traverse recursively so block/line indexes remain available while the
         # order of String elements remains exactly the document XML order.
-        def visit(element: ET.Element, current_block: Optional[int], current_line: Optional[int]) -> None:
+        def visit(
+            element: ET.Element,
+            current_block: Optional[int],
+            current_line: Optional[int],
+        ) -> None:
             nonlocal block_index, line_index
 
             name = _local_name(element.tag)
@@ -62,7 +90,7 @@ class ALTOReader:
                     )
 
                 words.append(
-                    OCRWord(
+                    ALTOWord(
                         index=len(words),
                         text=element.attrib["CONTENT"],
                         bbox=BoundingBox(

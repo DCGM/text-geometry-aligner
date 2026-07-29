@@ -9,14 +9,20 @@ from dataclasses import dataclass
 from typing import Any, Iterable, Optional, Sequence
 
 from ...alto_processing import ALTOTextIndex
-from ...models import (
+from ...models import AlignmentRegion
+from ..candidate import (
     CER_SCALE,
     SIMILARITY_SCALE,
     AlignmentCandidate,
-    JSONScalarValue,
 )
 from .base import CandidateGenerator
-from .utils import candidate_sort_key, replace_candidate_id
+from .utils import (
+    candidate_sort_key,
+    input_text,
+    normalized_input_text,
+    normalized_query_length,
+    replace_candidate_id,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -93,29 +99,30 @@ class AnchoredFuzzyTextCandidateGenerator(CandidateGenerator):
 
     def generate(
         self,
-        values: Sequence[JSONScalarValue],
+        regions: Sequence[AlignmentRegion],
         alto_index: ALTOTextIndex,
     ) -> tuple[AlignmentCandidate, ...]:
-        values_by_query: dict[str, list[JSONScalarValue]] = defaultdict(list)
-        for value in values:
-            if value.normalized_text:
-                values_by_query[value.normalized_text].append(value)
+        regions_by_query: dict[str, list[AlignmentRegion]] = defaultdict(list)
+        for region in regions:
+            normalized_query = normalized_input_text(region)
+            if normalized_query:
+                regions_by_query[normalized_query].append(region)
 
         candidates: list[AlignmentCandidate] = []
-        for normalized_query, query_values in values_by_query.items():
+        for normalized_query, query_regions in regions_by_query.items():
             scored_spans = self._generate_query_spans(normalized_query, alto_index)
-            for value in query_values:
+            for region in query_regions:
                 for span in scored_spans:
                     candidates.append(
                         AlignmentCandidate(
                             candidate_id=len(candidates),
-                            value_id=value.value_id,
-                            json_path=value.path,
+                            region_id=region.region_id,
+                            json_text_path=region.json_text_path,
                             start_word=span.start_word,
                             end_word=span.end_word,
                             start_char=span.start_char,
                             end_char=span.end_char,
-                            query_text=value.text,
+                            query_text=input_text(region),
                             matched_text=alto_index.text_for_word_interval(
                                 span.start_word,
                                 span.end_word,
@@ -126,7 +133,7 @@ class AnchoredFuzzyTextCandidateGenerator(CandidateGenerator):
                             edit_distance=span.edit_distance,
                             cer_int=span.cer_int,
                             similarity_int=span.similarity_int,
-                            query_length=value.query_length,
+                            query_length=normalized_query_length(region),
                             quality_chars=span.quality_chars,
                             source=span.source,
                         )

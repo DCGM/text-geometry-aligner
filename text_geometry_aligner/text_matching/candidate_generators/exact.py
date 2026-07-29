@@ -6,13 +6,15 @@ from collections import defaultdict
 from typing import Sequence
 
 from ...alto_processing import ALTOTextIndex
-from ...models import (
-    SIMILARITY_SCALE,
-    AlignmentCandidate,
-    JSONScalarValue,
-)
+from ...models import AlignmentRegion
+from ..candidate import SIMILARITY_SCALE, AlignmentCandidate
 from .base import CandidateGenerator
-from .utils import replace_candidate_id
+from .utils import (
+    input_text,
+    normalized_input_text,
+    normalized_query_length,
+    replace_candidate_id,
+)
 
 
 class ExactTextCandidateGenerator(CandidateGenerator):
@@ -22,34 +24,35 @@ class ExactTextCandidateGenerator(CandidateGenerator):
 
     def generate(
         self,
-        values: Sequence[JSONScalarValue],
+        regions: Sequence[AlignmentRegion],
         alto_index: ALTOTextIndex,
     ) -> tuple[AlignmentCandidate, ...]:
-        values_by_query: dict[str, list[JSONScalarValue]] = defaultdict(list)
-        for value in values:
-            if value.normalized_text:
-                values_by_query[value.normalized_text].append(value)
+        regions_by_query: dict[str, list[AlignmentRegion]] = defaultdict(list)
+        for region in regions:
+            normalized_query = normalized_input_text(region)
+            if normalized_query:
+                regions_by_query[normalized_query].append(region)
 
         candidates: list[AlignmentCandidate] = []
-        for normalized_query, query_values in values_by_query.items():
+        for normalized_query, query_regions in regions_by_query.items():
             occurrences = alto_index.find_exact_occurrences(normalized_query)
-            for value in query_values:
+            for region in query_regions:
                 for start_char, end_char, start_word, end_word in occurrences:
                     candidates.append(
                         AlignmentCandidate(
                             candidate_id=len(candidates),
-                            value_id=value.value_id,
-                            json_path=value.path,
+                            region_id=region.region_id,
+                            json_text_path=region.json_text_path,
                             start_word=start_word,
                             end_word=end_word,
                             start_char=start_char,
                             end_char=end_char,
-                            query_text=value.text,
+                            query_text=input_text(region),
                             matched_text=alto_index.text_for_word_interval(
                                 start_word,
                                 end_word,
                             ),
-                            normalized_query_text=value.normalized_text,
+                            normalized_query_text=normalized_query,
                             normalized_matched_text=(
                                 alto_index.normalized_text_for_word_interval(
                                     start_word,
@@ -60,15 +63,15 @@ class ExactTextCandidateGenerator(CandidateGenerator):
                             edit_distance=0,
                             cer_int=0,
                             similarity_int=self.EXACT_SIMILARITY,
-                            query_length=value.query_length,
-                            quality_chars=len(value.normalized_text),
+                            query_length=normalized_query_length(region),
+                            quality_chars=len(normalized_query),
                             source="exact",
                         )
                     )
 
         candidates.sort(
             key=lambda candidate: (
-                candidate.value_id,
+                candidate.region_id,
                 candidate.start_word,
                 candidate.end_word,
                 candidate.start_char,

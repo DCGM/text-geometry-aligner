@@ -7,13 +7,18 @@ from dataclasses import dataclass
 from typing import Any, Optional, Sequence
 
 from ...alto_processing import ALTOTextIndex
-from ...models import (
+from ...models import AlignmentRegion
+from ..candidate import (
     CER_SCALE,
     SIMILARITY_SCALE,
     AlignmentCandidate,
-    JSONScalarValue,
 )
 from .base import CandidateGenerator
+from .utils import (
+    input_text,
+    normalized_input_text,
+    normalized_query_length,
+)
 
 @dataclass(frozen=True)
 class OrderedAlignmentCandidateConfig:
@@ -60,10 +65,10 @@ class OrderedAlignmentCandidateGenerator(CandidateGenerator):
 
     def generate(
         self,
-        values: Sequence[JSONScalarValue],
+        regions: Sequence[AlignmentRegion],
         alto_index: ALTOTextIndex,
     ) -> tuple[AlignmentCandidate, ...]:
-        source_text, source_owners = _combine_values(values)
+        source_text, source_owners = _combine_regions(regions)
         target_text = alto_index.normalized_text
         if not source_text or not target_text:
             return ()
@@ -74,27 +79,31 @@ class OrderedAlignmentCandidateGenerator(CandidateGenerator):
             target_text,
             editops_function(source_text, target_text),
         )
-        words_by_value = _assign_words_to_values(
+        words_by_region = _assign_words_to_values(
             source_text,
             target_text,
             source_owners,
             source_to_target,
             alto_index,
         )
-        values_by_id = {value.value_id: value for value in values}
+        regions_by_id = {
+            region.region_id: region
+            for region in regions
+        }
 
         candidates: list[AlignmentCandidate] = []
-        for value_id in sorted(words_by_value):
-            value = values_by_id[value_id]
-            if not value.normalized_text:
+        for region_id in sorted(words_by_region):
+            region = regions_by_id[region_id]
+            normalized_query = normalized_input_text(region)
+            if not normalized_query:
                 continue
 
-            owned_words = words_by_value[value_id]
+            owned_words = words_by_region[region_id]
             start_word = min(owned_words)
             end_word = max(owned_words)
             start_word, end_word, normalized_matched_text, edit_distance = (
                 _trim_misaligned_edge_words(
-                    value.normalized_text,
+                    normalized_query,
                     start_word,
                     end_word,
                     alto_index,
@@ -110,28 +119,28 @@ class OrderedAlignmentCandidateGenerator(CandidateGenerator):
 
             if not self.config.accepts(
                 edit_distance,
-                len(value.normalized_text),
-                value.query_length,
+                len(normalized_query),
+                normalized_query_length(region),
             ):
                 continue
 
-            cer = edit_distance / len(value.normalized_text)
+            cer = edit_distance / len(normalized_query)
             start_char, end_char = char_interval
             candidates.append(
                 AlignmentCandidate(
                     candidate_id=len(candidates),
-                    value_id=value.value_id,
-                    json_path=value.path,
+                    region_id=region.region_id,
+                    json_text_path=region.json_text_path,
                     start_word=start_word,
                     end_word=end_word,
                     start_char=start_char,
                     end_char=end_char,
-                    query_text=value.text,
+                    query_text=input_text(region),
                     matched_text=alto_index.text_for_word_interval(
                         start_word,
                         end_word,
                     ),
-                    normalized_query_text=value.normalized_text,
+                    normalized_query_text=normalized_query,
                     normalized_matched_text=normalized_matched_text,
                     exact=edit_distance == 0,
                     edit_distance=edit_distance,
@@ -139,10 +148,10 @@ class OrderedAlignmentCandidateGenerator(CandidateGenerator):
                     similarity_int=round(
                         max(0.0, 1.0 - cer) * SIMILARITY_SCALE
                     ),
-                    query_length=value.query_length,
+                    query_length=normalized_query_length(region),
                     quality_chars=max(
                         0,
-                        len(value.normalized_text) - edit_distance,
+                        len(normalized_query) - edit_distance,
                     ),
                     source=self.SOURCE,
                 )
@@ -152,19 +161,20 @@ class OrderedAlignmentCandidateGenerator(CandidateGenerator):
         return tuple(candidates)
 
 
-def _combine_values(
-    values: Sequence[JSONScalarValue],
+def _combine_regions(
+    regions: Sequence[AlignmentRegion],
 ) -> tuple[str, tuple[Optional[int], ...]]:
     parts: list[str] = []
     owners: list[Optional[int]] = []
-    for value in sorted(values, key=lambda item: item.value_id):
-        if not value.normalized_text:
+    for region in sorted(regions, key=lambda item: item.region_id):
+        normalized_text = normalized_input_text(region)
+        if not normalized_text:
             continue
         if parts:
             parts.append(" ")
             owners.append(None)
-        parts.append(value.normalized_text)
-        owners.extend([value.value_id] * len(value.normalized_text))
+        parts.append(normalized_text)
+        owners.extend([region.region_id] * len(normalized_text))
     return "".join(parts), tuple(owners)
 
 
@@ -225,28 +235,28 @@ def _assign_words_to_values(
 ) -> dict[int, tuple[int, ...]]:
     votes_by_word: dict[int, Counter[int]] = defaultdict(Counter)
     for source_index, target_index in enumerate(source_to_target):
-        value_id = source_owners[source_index]
-        if value_id is None or target_index is None:
+        region_id = source_owners[source_index]
+        if region_id is None or target_index is None:
             continue
         word_index = alto_index.word_index_for_char(target_index)
         if word_index is None:
             continue
         weight = 2 if source_text[source_index] == target_text[target_index] else 1
-        votes_by_word[word_index][value_id] += weight
+        votes_by_word[word_index][region_id] += weight
 
-    words_by_value: dict[int, list[int]] = defaultdict(list)
+    words_by_region: dict[int, list[int]] = defaultdict(list)
     for word_index, votes in sorted(votes_by_word.items()):
-        value_id = min(
+        region_id = min(
             votes,
-            key=lambda candidate_value_id: (
-                -votes[candidate_value_id],
-                candidate_value_id,
+            key=lambda candidate_region_id: (
+                -votes[candidate_region_id],
+                candidate_region_id,
             ),
         )
-        words_by_value[value_id].append(word_index)
+        words_by_region[region_id].append(word_index)
     return {
-        value_id: tuple(word_indexes)
-        for value_id, word_indexes in words_by_value.items()
+        region_id: tuple(word_indexes)
+        for region_id, word_indexes in words_by_region.items()
     }
 
 
@@ -303,15 +313,15 @@ def _trim_misaligned_edge_words(
 def _validate_final_candidates(
     candidates: Sequence[AlignmentCandidate],
 ) -> None:
-    value_ids: set[int] = set()
+    region_ids: set[int] = set()
     occupied_words: set[int] = set()
     for candidate in candidates:
-        if candidate.value_id in value_ids:
+        if candidate.region_id in region_ids:
             raise RuntimeError(
                 f"Ordered alignment produced multiple candidates for value "
-                f"{candidate.value_id}"
+                f"{candidate.region_id}"
             )
-        value_ids.add(candidate.value_id)
+        region_ids.add(candidate.region_id)
 
         overlapping_words = occupied_words.intersection(candidate.word_indexes)
         if overlapping_words:

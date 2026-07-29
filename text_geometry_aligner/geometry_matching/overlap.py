@@ -4,10 +4,10 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Callable, Sequence
 
+from ..alto_io import ALTOWord
 from ..models import (
+    AlignmentRegion,
     BoundingBox,
-    JSONGeometryRegion,
-    OCRWord,
     Polygon,
 )
 from ..utils import _format_json_path
@@ -28,8 +28,8 @@ class GeometryOverlapCalculator(ABC):
     @abstractmethod
     def calculate(
         self,
-        regions: Sequence[JSONGeometryRegion],
-        words: Sequence[OCRWord],
+        regions: Sequence[AlignmentRegion],
+        words: Sequence[ALTOWord],
         minimum_word_coverage: float,
     ) -> tuple[WordCoverage, ...]:
         raise NotImplementedError
@@ -40,12 +40,12 @@ class BoundingBoxOverlapCalculator(GeometryOverlapCalculator):
 
     def calculate(
         self,
-        regions: Sequence[JSONGeometryRegion],
-        words: Sequence[OCRWord],
+        regions: Sequence[AlignmentRegion],
+        words: Sequence[ALTOWord],
         minimum_word_coverage: float,
     ) -> tuple[WordCoverage, ...]:
         _validate_threshold(minimum_word_coverage)
-        if any(isinstance(region.geometry, Polygon) for region in regions):
+        if any(isinstance(region.input_geometry, Polygon) for region in regions):
             raise RuntimeError(
                 "Polygon geometry alignment requires Shapely. Install it "
                 "with: python -m pip install Shapely"
@@ -53,7 +53,7 @@ class BoundingBoxOverlapCalculator(GeometryOverlapCalculator):
 
         coverages: list[WordCoverage] = []
         for region in regions:
-            geometry = region.geometry
+            geometry = region.input_geometry
             if not isinstance(geometry, BoundingBox):
                 continue
             for word in words:
@@ -95,8 +95,8 @@ class ShapelyOverlapCalculator(GeometryOverlapCalculator):
 
     def calculate(
         self,
-        regions: Sequence[JSONGeometryRegion],
-        words: Sequence[OCRWord],
+        regions: Sequence[AlignmentRegion],
+        words: Sequence[ALTOWord],
         minimum_word_coverage: float,
     ) -> tuple[WordCoverage, ...]:
         _validate_threshold(minimum_word_coverage)
@@ -118,7 +118,10 @@ class ShapelyOverlapCalculator(GeometryOverlapCalculator):
         coverages: list[WordCoverage] = []
         for region in regions:
             region_shape = region_shapes[region.region_id]
-            region_bounds = region.geometry.bounds
+            geometry = region.input_geometry
+            if geometry is None:
+                continue
+            region_bounds = geometry.bounds
             for word in words:
                 word_shape = word_shapes.get(word.index)
                 if word_shape is None:
@@ -142,8 +145,10 @@ class ShapelyOverlapCalculator(GeometryOverlapCalculator):
                     )
         return tuple(coverages)
 
-    def _region_shape(self, region: JSONGeometryRegion) -> Any:
-        geometry = region.geometry
+    def _region_shape(self, region: AlignmentRegion) -> Any:
+        geometry = region.input_geometry
+        if geometry is None:
+            raise ValueError(f"Region {region.region_id} has no input geometry")
         if isinstance(geometry, BoundingBox):
             return self.geometry_factory(
                 geometry.x,
@@ -156,18 +161,21 @@ class ShapelyOverlapCalculator(GeometryOverlapCalculator):
         if shape.is_empty or shape.area <= 0 or not shape.is_valid:
             raise ValueError(
                 "Invalid polygon at "
-                f"{_format_json_path(region.geometry_path)}"
+                f"{_format_json_path(region.json_geometry_path or ())}"
             )
         return shape
 
 
 def create_overlap_calculator(
-    regions: Sequence[JSONGeometryRegion],
+    regions: Sequence[AlignmentRegion],
 ) -> GeometryOverlapCalculator:
     try:
         box_factory = _load_shapely_box_factory()
     except ImportError as exc:
-        if any(isinstance(region.geometry, Polygon) for region in regions):
+        if any(
+            isinstance(region.input_geometry, Polygon)
+            for region in regions
+        ):
             raise RuntimeError(
                 "Polygon geometry alignment requires Shapely. Install it "
                 "with: python -m pip install Shapely"

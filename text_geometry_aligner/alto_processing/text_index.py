@@ -1,10 +1,20 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from dataclasses import dataclass
 from typing import Optional
 
-from ..models import ALTOPage, OCRWordSpan
+from ..alto_io import ALTOPage
 from ..normalization import TextNormalizer
+
+
+@dataclass(frozen=True)
+class ALTOWordSpan:
+    """Character interval occupied by an ALTO word in normalized page text."""
+
+    word_index: int
+    char_start: int
+    char_end: int  # Exclusive.
 
 
 class ALTOTextIndex:
@@ -14,10 +24,11 @@ class ALTOTextIndex:
         self.page = page
         self.normalizer = normalizer
         self.normalized_words: list[str] = []
-        self.word_spans: list[OCRWordSpan] = []
-        self._span_by_start: dict[int, OCRWordSpan] = {}
-        self._span_by_end: dict[int, OCRWordSpan] = {}
-        self._span_by_word: dict[int, OCRWordSpan] = {}
+        self.word_spans: list[ALTOWordSpan] = []
+        self._span_by_start: dict[int, ALTOWordSpan] = {}
+        self._span_by_end: dict[int, ALTOWordSpan] = {}
+        self._span_by_word: dict[int, ALTOWordSpan] = {}
+        self._normalized_word_by_index: dict[int, str] = {}
         self._word_index_by_char: list[Optional[int]] = []
         token_positions: dict[str, set[int]] = defaultdict(set)
         trigram_word_positions: dict[str, set[int]] = defaultdict(set)
@@ -27,6 +38,7 @@ class ALTOTextIndex:
 
         for word in page.words:
             normalized_word = normalizer.normalize(word.text)
+            self._normalized_word_by_index[word.index] = normalized_word
             if not normalized_word:
                 # An empty normalized word cannot take part in exact matching.
                 self.normalized_words.append("")
@@ -45,7 +57,7 @@ class ALTOTextIndex:
             cursor += len(normalized_word)
             end = cursor
 
-            span = OCRWordSpan(
+            span = ALTOWordSpan(
                 word_index=word.index,
                 char_start=start,
                 char_end=end,
@@ -134,6 +146,16 @@ class ALTOTextIndex:
             ]
             if normalized_word
         )
+
+    def normalized_word_for_index(self, word_index: int) -> str:
+        """Return normalized text for one ALTO word index."""
+
+        try:
+            return self._normalized_word_by_index[word_index]
+        except KeyError as exc:
+            raise KeyError(
+                f"No normalized ALTO word with index {word_index}"
+            ) from exc
 
     def char_interval_for_word_interval(
         self,

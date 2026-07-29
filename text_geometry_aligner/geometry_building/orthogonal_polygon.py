@@ -5,7 +5,8 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import Sequence
 
-from ..models import BoundingBox, OCRWord, Point, Polygon
+from ..alto_io import ALTOWord
+from ..models import BoundingBox, Point, Polygon
 from .base import GeometryBuilder
 from .union_bounding_box import UnionBoundingBoxGeometryBuilder
 
@@ -22,7 +23,7 @@ class OrthogonalPolygonGeometryBuilder(GeometryBuilder):
     decision is independent for the left and right edges.
     """
 
-    def build(self, words: Sequence[OCRWord]) -> Polygon:
+    def build(self, words: Sequence[ALTOWord]) -> Polygon:
         if not words:
             raise ValueError("Cannot construct geometry from an empty word sequence")
 
@@ -51,7 +52,7 @@ def _bounding_box_corners(box: BoundingBox) -> tuple[Point, ...]:
     )
 
 
-def _union_bounding_polygon(words: Sequence[OCRWord]) -> Polygon:
+def _union_bounding_polygon(words: Sequence[ALTOWord]) -> Polygon:
     corners = _bounding_box_corners(
         UnionBoundingBoxGeometryBuilder().build(words)
     )
@@ -59,7 +60,7 @@ def _union_bounding_polygon(words: Sequence[OCRWord]) -> Polygon:
 
 
 def _alto_line_or_word_boxes(
-    words: Sequence[OCRWord],
+    words: Sequence[ALTOWord],
 ) -> list[BoundingBox]:
     """Use ALTO line envelopes, retaining individual boxes without a line ID."""
 

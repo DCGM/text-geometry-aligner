@@ -2,15 +2,12 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections import defaultdict
+from dataclasses import dataclass
 from enum import Enum
 from typing import Sequence
 
-from ..models import (
-    GeometryWordAlignment,
-    JSONGeometryRegion,
-    OCRWord,
-)
-from ..text_building import SpaceSeparatedTextBuilder, TextBuilder
+from ..alto_io import ALTOWord
+from ..models import AlignmentRegion
 from .overlap import WordCoverage
 
 
@@ -19,57 +16,56 @@ class WordAssignmentStrategy(str, Enum):
     ALL_OVER_THRESHOLD = "all-over-threshold"
 
 
+@dataclass(frozen=True)
+class RegionWordAssignment:
+    """Selected ALTO word indexes and coverages for one region."""
+
+    region_id: int
+    word_indexes: tuple[int, ...]
+    word_coverages: tuple[float, ...]
+
+
 class GeometryWordAssigner(ABC):
     """Resolve eligible word coverage into final region assignments."""
-
-    def __init__(self, text_builder: TextBuilder | None = None):
-        self.text_builder = text_builder or SpaceSeparatedTextBuilder()
 
     @abstractmethod
     def assign(
         self,
-        regions: Sequence[JSONGeometryRegion],
-        words: Sequence[OCRWord],
+        regions: Sequence[AlignmentRegion],
+        words: Sequence[ALTOWord],
         coverages: Sequence[WordCoverage],
-    ) -> tuple[GeometryWordAlignment, ...]:
+    ) -> tuple[RegionWordAssignment, ...]:
         raise NotImplementedError
 
-    def _build_alignments(
-        self,
-        regions: Sequence[JSONGeometryRegion],
-        words: Sequence[OCRWord],
+    @staticmethod
+    def _build_assignments(
+        regions: Sequence[AlignmentRegion],
         retained: Sequence[WordCoverage],
-    ) -> tuple[GeometryWordAlignment, ...]:
-        words_by_index = {word.index: word for word in words}
+    ) -> tuple[RegionWordAssignment, ...]:
         coverage_by_region: dict[int, list[WordCoverage]] = defaultdict(list)
         for coverage in retained:
             coverage_by_region[coverage.region_id].append(coverage)
 
-        alignments: list[GeometryWordAlignment] = []
+        assignments: list[RegionWordAssignment] = []
         for region in regions:
             region_coverages = sorted(
                 coverage_by_region.get(region.region_id, ()),
                 key=lambda item: item.word_index,
             )
-            word_indexes = tuple(
-                coverage.word_index
-                for coverage in region_coverages
-            )
-            extracted_text = self.text_builder.build(
-                tuple(words_by_index[index] for index in word_indexes)
-            )
-            alignments.append(
-                GeometryWordAlignment(
-                    region=region,
-                    word_indexes=word_indexes,
+            assignments.append(
+                RegionWordAssignment(
+                    region_id=region.region_id,
+                    word_indexes=tuple(
+                        coverage.word_index
+                        for coverage in region_coverages
+                    ),
                     word_coverages=tuple(
                         coverage.coverage
                         for coverage in region_coverages
                     ),
-                    extracted_text=extracted_text,
                 )
             )
-        return tuple(alignments)
+        return tuple(assignments)
 
 
 class GreatestCoverageWordAssigner(GeometryWordAssigner):
@@ -77,10 +73,11 @@ class GreatestCoverageWordAssigner(GeometryWordAssigner):
 
     def assign(
         self,
-        regions: Sequence[JSONGeometryRegion],
-        words: Sequence[OCRWord],
+        regions: Sequence[AlignmentRegion],
+        words: Sequence[ALTOWord],
         coverages: Sequence[WordCoverage],
-    ) -> tuple[GeometryWordAlignment, ...]:
+    ) -> tuple[RegionWordAssignment, ...]:
+        del words
         best_by_word: dict[int, WordCoverage] = {}
         for coverage in coverages:
             current = best_by_word.get(coverage.word_index)
@@ -92,9 +89,8 @@ class GreatestCoverageWordAssigner(GeometryWordAssigner):
                 )
             ):
                 best_by_word[coverage.word_index] = coverage
-        return self._build_alignments(
+        return self._build_assignments(
             regions,
-            words,
             tuple(best_by_word.values()),
         )
 
@@ -104,18 +100,18 @@ class AllOverThresholdWordAssigner(GeometryWordAssigner):
 
     def assign(
         self,
-        regions: Sequence[JSONGeometryRegion],
-        words: Sequence[OCRWord],
+        regions: Sequence[AlignmentRegion],
+        words: Sequence[ALTOWord],
         coverages: Sequence[WordCoverage],
-    ) -> tuple[GeometryWordAlignment, ...]:
-        return self._build_alignments(regions, words, coverages)
+    ) -> tuple[RegionWordAssignment, ...]:
+        del words
+        return self._build_assignments(regions, coverages)
 
 
 def create_word_assigner(
     strategy: WordAssignmentStrategy | str,
-    text_builder: TextBuilder | None = None,
 ) -> GeometryWordAssigner:
     parsed_strategy = WordAssignmentStrategy(strategy)
     if parsed_strategy is WordAssignmentStrategy.GREATEST_COVERAGE:
-        return GreatestCoverageWordAssigner(text_builder=text_builder)
-    return AllOverThresholdWordAssigner(text_builder=text_builder)
+        return GreatestCoverageWordAssigner()
+    return AllOverThresholdWordAssigner()

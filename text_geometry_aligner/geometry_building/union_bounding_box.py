@@ -4,14 +4,15 @@ from __future__ import annotations
 
 from typing import Sequence
 
-from ..models import BoundingBox, OCRWord
+from ..alto_io import ALTOWord
+from ..models import BoundingBox
 from .base import GeometryBuilder
 
 
 class UnionBoundingBoxGeometryBuilder(GeometryBuilder):
     """Return one rectangle covering all matched ALTO word boxes."""
 
-    def build(self, words: Sequence[OCRWord]) -> BoundingBox:
+    def build(self, words: Sequence[ALTOWord]) -> BoundingBox:
         if not words:
             raise ValueError(
                 "Cannot construct geometry from an empty word sequence"

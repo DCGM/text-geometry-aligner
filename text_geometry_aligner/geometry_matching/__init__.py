@@ -4,6 +4,7 @@ from .assignment import (
     AllOverThresholdWordAssigner,
     GeometryWordAssigner,
     GreatestCoverageWordAssigner,
+    RegionWordAssignment,
     WordAssignmentStrategy,
     create_word_assigner,
 )
@@ -21,6 +22,7 @@ __all__ = [
     "GeometryOverlapCalculator",
     "GeometryWordAssigner",
     "GreatestCoverageWordAssigner",
+    "RegionWordAssignment",
     "ShapelyOverlapCalculator",
     "WordAssignmentStrategy",
     "WordCoverage",

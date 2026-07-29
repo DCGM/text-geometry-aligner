@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import copy
 import logging
+from pathlib import Path
 from typing import Any, Sequence
 
-from ..models import JSONPath, JSONScalarValue
+from ..models import AlignmentPage, AlignmentRegion, InputFormat, JSONPath
 from ..utils import _format_json_path
 
 logger = logging.getLogger(__name__)
@@ -28,8 +30,14 @@ class JSONTextExtractor:
             (*ignored_geometry_suffixes, geometry_suffix)
         )
 
-    def extract(self, data: Any) -> tuple[JSONScalarValue, ...]:
-        values: list[JSONScalarValue] = []
+    def extract_alignment_region(
+        self,
+        data: Any,
+    ) -> tuple[AlignmentRegion, ...]:
+        if not isinstance(data, dict):
+            raise TypeError("Text-alignment JSON root must be an object")
+
+        regions: list[AlignmentRegion] = []
 
         def append_value(
             value: str | int | float,
@@ -37,15 +45,13 @@ class JSONTextExtractor:
             key: str,
             geometry_path: JSONPath,
         ) -> None:
-            values.append(
-                JSONScalarValue(
-                    value_id=len(values),
-                    path=path,
-                    key=key,
-                    original_value=value,
-                    text=str(value),
-                    normalized_text="",
-                    geometry_path=geometry_path,
+            regions.append(
+                AlignmentRegion(
+                    region_id=len(regions),
+                    label=key,
+                    input_text=value,
+                    json_text_path=path,
+                    json_geometry_path=geometry_path,
                 )
             )
 
@@ -74,7 +80,10 @@ class JSONTextExtractor:
                         not self.overwrite_existing_geometry
                         and geometry_key in node
                     ):
-                        logger.debug("Preserving existing geometry at %s", _format_json_path(child_path))
+                        logger.debug(
+                            "Preserving existing geometry at %s",
+                            _format_json_path(child_path),
+                        )
                         continue
 
                     if _is_alignable_scalar(value):
@@ -127,7 +136,24 @@ class JSONTextExtractor:
                         )
 
         visit(data, ())
-        return tuple(values)
+        return tuple(regions)
+
+    def extract_alignment_page(
+        self,
+        data: Any,
+        *,
+        page_key: str,
+        input_file_path: Path | None = None,
+    ) -> AlignmentPage:
+        """Extract text regions and wrap them in one JSON alignment page."""
+
+        return AlignmentPage(
+            page_key=page_key,
+            input_format=InputFormat.JSON,
+            regions=list(self.extract_alignment_region(data)),
+            input_file_path=input_file_path,
+            json_source_data=copy.deepcopy(data),
+        )
 
 
 def _is_alignable_scalar(value: Any) -> bool:

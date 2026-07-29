@@ -6,32 +6,33 @@ import logging
 from collections import defaultdict
 from typing import Sequence
 
-from ..models import AlignmentCandidate, JSONScalarValue
+from ..models import AlignmentRegion
 from ..utils import _format_json_path
+from .candidate import AlignmentCandidate
 
 logger = logging.getLogger(__name__)
 
 
-def _find_ambiguous_value_ids(
+def _find_ambiguous_region_ids(
     candidates: Sequence[AlignmentCandidate],
 ) -> tuple[int, ...]:
-    by_value: dict[int, list[AlignmentCandidate]] = defaultdict(list)
+    by_region: dict[int, list[AlignmentCandidate]] = defaultdict(list)
     for candidate in candidates:
-        by_value[candidate.value_id].append(candidate)
+        by_region[candidate.region_id].append(candidate)
 
     ambiguous: list[int] = []
-    for value_id, value_candidates in by_value.items():
+    for region_id, region_candidates in by_region.items():
         best_key = max(
             (
                 candidate.quality_chars,
                 int(candidate.exact),
                 candidate.similarity_int,
             )
-            for candidate in value_candidates
+            for candidate in region_candidates
         )
         best_spans = {
             (candidate.start_word, candidate.end_word)
-            for candidate in value_candidates
+            for candidate in region_candidates
             if (
                 candidate.quality_chars,
                 int(candidate.exact),
@@ -40,41 +41,47 @@ def _find_ambiguous_value_ids(
             == best_key
         }
         if len(best_spans) > 1:
-            ambiguous.append(value_id)
+            ambiguous.append(region_id)
             logger.warning(
-                "Value %d has %d equally ranked candidate spans",
-                value_id,
+                "Region %d has %d equally ranked candidate spans",
+                region_id,
                 len(best_spans),
             )
     return tuple(sorted(ambiguous))
 
-def _find_conflicted_value_ids(
+
+def _find_conflicted_region_ids(
     candidates: Sequence[AlignmentCandidate],
     selected_candidates: Sequence[AlignmentCandidate],
-    values: Sequence[JSONScalarValue],
+    regions: Sequence[AlignmentRegion],
 ) -> tuple[int, ...]:
-    selected_value_ids = {candidate.value_id for candidate in selected_candidates}
+    selected_region_ids = {
+        candidate.region_id for candidate in selected_candidates
+    }
     selected_words = {
         word_index
         for candidate in selected_candidates
         for word_index in candidate.word_indexes
     }
-    by_value: dict[int, list[AlignmentCandidate]] = defaultdict(list)
+    by_region: dict[int, list[AlignmentCandidate]] = defaultdict(list)
     for candidate in candidates:
-        by_value[candidate.value_id].append(candidate)
+        by_region[candidate.region_id].append(candidate)
 
     conflicted: list[int] = []
-    for value in values:
-        if value.value_id in selected_value_ids:
+    for region in regions:
+        if region.region_id in selected_region_ids:
             continue
-        value_candidates = by_value.get(value.value_id, ())
-        if value_candidates and all(
-            any(word_index in selected_words for word_index in candidate.word_indexes)
-            for candidate in value_candidates
+        region_candidates = by_region.get(region.region_id, ())
+        if region_candidates and all(
+            any(
+                word_index in selected_words
+                for word_index in candidate.word_indexes
+            )
+            for candidate in region_candidates
         ):
-            conflicted.append(value.value_id)
+            conflicted.append(region.region_id)
             logger.warning(
                 "All candidates for %s conflict with selected ALTO words",
-                _format_json_path(value.path),
+                _format_json_path(region.json_text_path or ()),
             )
     return tuple(conflicted)

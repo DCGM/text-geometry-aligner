@@ -9,6 +9,7 @@ from unittest import mock
 
 import text_geometry_aligner as alignment
 from text_geometry_aligner import (
+    base_aligner as base_aligner_module,
     geometry_aligner as geometry_aligner_module,
 )
 from text_geometry_aligner.geometry_matching import (
@@ -23,8 +24,8 @@ def _word(
     y: float = 0,
     width: float = 10,
     height: float = 10,
-) -> alignment.OCRWord:
-    return alignment.OCRWord(
+) -> alignment.ALTOWord:
+    return alignment.ALTOWord(
         index=index,
         text=text,
         bbox=alignment.BoundingBox(x, y, width, height),
@@ -33,7 +34,7 @@ def _word(
     )
 
 
-def _page(*words: alignment.OCRWord) -> alignment.ALTOPage:
+def _page(*words: alignment.ALTOWord) -> alignment.ALTOPage:
     return alignment.ALTOPage(
         source_path=Path("page.xml"),
         words=tuple(words),
@@ -51,9 +52,13 @@ def _bbox(
     return {"x": x, "y": y, "width": width, "height": height}
 
 
+def _output(aligner, document):
+    return aligner.export_page(document.pages[0])
+
+
 class JSONGeometryExtractorTests(unittest.TestCase):
     def test_extracts_nested_bbox_lists_and_retains_parallel_paths(self) -> None:
-        regions = alignment.JSONGeometryExtractor().extract(
+        regions = alignment.JSONGeometryExtractor().extract_alignment_region(
             {
                 "groups": [
                     {
@@ -68,14 +73,14 @@ class JSONGeometryExtractorTests(unittest.TestCase):
         )
 
         self.assertEqual(
-            [region.geometry_path for region in regions],
+            [region.json_geometry_path for region in regions],
             [
                 ("groups", 0, "publisher_bbox", 0),
                 ("groups", 0, "publisher_bbox", 2),
             ],
         )
         self.assertEqual(
-            [region.text_path for region in regions],
+            [region.json_text_path for region in regions],
             [
                 ("groups", 0, "publisher", 0),
                 ("groups", 0, "publisher", 2),
@@ -83,7 +88,7 @@ class JSONGeometryExtractorTests(unittest.TestCase):
         )
         self.assertTrue(
             all(
-                isinstance(region.geometry, alignment.BoundingBox)
+                isinstance(region.input_geometry, alignment.BoundingBox)
                 for region in regions
             )
         )
@@ -96,16 +101,18 @@ class JSONGeometryExtractorTests(unittest.TestCase):
             "emptyText_bbox": _bbox(10),
         }
 
-        regions = alignment.JSONGeometryExtractor().extract(data)
+        regions = (
+            alignment.JSONGeometryExtractor().extract_alignment_region(data)
+        )
         overwritten = alignment.JSONGeometryExtractor(
             overwrite_existing_text=True
-        ).extract(data)
+        ).extract_alignment_region(data)
 
         self.assertEqual(regions, ())
         self.assertEqual(len(overwritten), 2)
 
     def test_protected_destination_skips_geometry_parsing(self) -> None:
-        regions = alignment.JSONGeometryExtractor().extract(
+        regions = alignment.JSONGeometryExtractor().extract_alignment_region(
             {
                 "title": "existing",
                 "title_bbox": {"not": "a bbox"},
@@ -117,7 +124,7 @@ class JSONGeometryExtractorTests(unittest.TestCase):
     def test_custom_suffix_can_extract_polygon(self) -> None:
         regions = alignment.JSONGeometryExtractor(
             geometry_suffix="_shape"
-        ).extract(
+        ).extract_alignment_region(
             {
                 "title_shape": [
                     [0, 0],
@@ -129,45 +136,62 @@ class JSONGeometryExtractorTests(unittest.TestCase):
             }
         )
 
-        self.assertEqual(regions[0].text_path, ("title",))
-        self.assertIsInstance(regions[0].geometry, alignment.Polygon)
+        self.assertEqual(regions[0].json_text_path, ("title",))
+        self.assertIsInstance(regions[0].input_geometry, alignment.Polygon)
 
     def test_invalid_geometry_reports_its_json_path(self) -> None:
         with self.assertRaisesRegex(ValueError, r"\$\.title_bbox"):
-            alignment.JSONGeometryExtractor().extract(
+            alignment.JSONGeometryExtractor().extract_alignment_region(
                 {"title_bbox": {"x": 0, "y": 0, "width": 10}}
             )
 
 
-class JSONTextMergerTests(unittest.TestCase):
-    def test_missing_list_destination_mirrors_trailing_null_shape(self) -> None:
-        merger = alignment.JSONTextMerger(geometry_suffix="_bbox")
-        output = merger.create_output(
-            {"publisher_bbox": [_bbox(0), None]}
+class AlignmentJSONExporterTests(unittest.TestCase):
+    @staticmethod
+    def _page(
+        data,
+        *,
+        overwrite_existing_text: bool = False,
+    ) -> alignment.AlignmentPage:
+        extractor = alignment.JSONGeometryExtractor(
+            overwrite_existing_text=overwrite_existing_text
+        )
+        return extractor.extract_alignment_page(
+            data,
+            page_key="page",
         )
 
-        self.assertEqual(output["publisher"], [None, None])
+    @staticmethod
+    def _export(page: alignment.AlignmentPage):
+        return alignment.AlignmentJSONExporter(
+            alignment_mode=alignment.AlignmentMode.GEOMETRY,
+            geometry_suffix="_bbox",
+            output_geometry_format=alignment.OutputGeometryFormat.BBOX,
+        ).export(page)
 
-        merger.set_text(output, ("publisher", 0), "FIRST")
+    def test_missing_list_destination_mirrors_trailing_null_shape(self) -> None:
+        page = self._page(
+            {"publisher_bbox": [_bbox(0), None]},
+        )
+        page.regions[0].alto_text = "FIRST"
+        output = self._export(page)
         self.assertEqual(output["publisher"], ["FIRST", None])
 
     def test_incompatible_existing_container_is_not_replaced(self) -> None:
-        merger = alignment.JSONTextMerger(overwrite_existing_text=True)
-        output = merger.create_output(
-            {"publisher": "existing", "publisher_bbox": [_bbox(0)]}
+        page = self._page(
+            {"publisher": "existing", "publisher_bbox": [_bbox(0)]},
+            overwrite_existing_text=True,
         )
-
+        page.regions[0].alto_text = "FIRST"
         with self.assertRaisesRegex(TypeError, "Incompatible container"):
-            merger.set_text(output, ("publisher", 0), "FIRST")
+            self._export(page)
 
-    def test_merger_itself_preserves_an_existing_destination(self) -> None:
-        merger = alignment.JSONTextMerger()
-        output = merger.create_output(
+    def test_page_extraction_preserves_an_existing_destination(self) -> None:
+        page = self._page(
             {"title": None, "title_bbox": _bbox(0)}
         )
-
-        merger.set_text(output, ("title",), "ALTO")
-
+        output = self._export(page)
+        self.assertEqual(page.regions, [])
         self.assertIsNone(output["title"])
 
 
@@ -181,11 +205,12 @@ class BoundingBoxOverlapTests(unittest.TestCase):
         region_bbox: alignment.BoundingBox,
         threshold: float,
     ) -> tuple[alignment.WordCoverage, ...]:
-        region = alignment.JSONGeometryRegion(
+        region = alignment.AlignmentRegion(
             region_id=0,
-            geometry_path=("title_bbox",),
-            text_path=("title",),
-            geometry=region_bbox,
+            label="title",
+            json_geometry_path=("title_bbox",),
+            json_text_path=("title",),
+            input_geometry=region_bbox,
         )
         return self.calculator.calculate(
             (region,),
@@ -216,11 +241,12 @@ class BoundingBoxOverlapTests(unittest.TestCase):
         )
 
     def test_polygon_requires_optional_shapely_dependency(self) -> None:
-        region = alignment.JSONGeometryRegion(
+        region = alignment.AlignmentRegion(
             region_id=0,
-            geometry_path=("title_polygon",),
-            text_path=("title",),
-            geometry=alignment.Polygon(
+            label="title",
+            json_geometry_path=("title_polygon",),
+            json_text_path=("title",),
+            input_geometry=alignment.Polygon(
                 ((0, 0), (10, 0), (10, 10), (0, 10), (0, 0))
             ),
         )
@@ -229,11 +255,12 @@ class BoundingBoxOverlapTests(unittest.TestCase):
             self.calculator.calculate((region,), (self.word,), 0.65)
 
     def test_factory_falls_back_to_bbox_when_shapely_is_unavailable(self) -> None:
-        region = alignment.JSONGeometryRegion(
+        region = alignment.AlignmentRegion(
             region_id=0,
-            geometry_path=("title_bbox",),
-            text_path=("title",),
-            geometry=alignment.BoundingBox(0, 0, 10, 10),
+            label="title",
+            json_geometry_path=("title_bbox",),
+            json_text_path=("title",),
+            input_geometry=alignment.BoundingBox(0, 0, 10, 10),
         )
         with mock.patch.object(
             overlap_module,
@@ -248,11 +275,12 @@ class BoundingBoxOverlapTests(unittest.TestCase):
         )
 
     def test_factory_reports_missing_shapely_for_polygon(self) -> None:
-        region = alignment.JSONGeometryRegion(
+        region = alignment.AlignmentRegion(
             region_id=0,
-            geometry_path=("title_polygon",),
-            text_path=("title",),
-            geometry=alignment.Polygon(
+            label="title",
+            json_geometry_path=("title_polygon",),
+            json_text_path=("title",),
+            input_geometry=alignment.Polygon(
                 ((0, 0), (10, 0), (10, 10), (0, 10), (0, 0))
             ),
         )
@@ -282,11 +310,12 @@ class BoundingBoxOverlapTests(unittest.TestCase):
         def fake_box(x_min, y_min, x_max, y_max):
             return FakeShape(x_min, y_min, x_max, y_max)
 
-        region = alignment.JSONGeometryRegion(
+        region = alignment.AlignmentRegion(
             region_id=0,
-            geometry_path=("title_bbox",),
-            text_path=("title",),
-            geometry=alignment.BoundingBox(0, 0, 6.5, 10),
+            label="title",
+            json_geometry_path=("title_bbox",),
+            json_text_path=("title",),
+            input_geometry=alignment.BoundingBox(0, 0, 6.5, 10),
         )
         fallback = alignment.BoundingBoxOverlapCalculator().calculate(
             (region,),
@@ -312,17 +341,19 @@ class WordAssignmentTests(unittest.TestCase):
             _word(1, "SECOND", 10),
         )
         self.regions = (
-            alignment.JSONGeometryRegion(
-                0,
-                ("first_bbox",),
-                ("first",),
-                alignment.BoundingBox(0, 0, 20, 10),
+            alignment.AlignmentRegion(
+                region_id=0,
+                label="first",
+                json_geometry_path=("first_bbox",),
+                json_text_path=("first",),
+                input_geometry=alignment.BoundingBox(0, 0, 20, 10),
             ),
-            alignment.JSONGeometryRegion(
-                1,
-                ("second_bbox",),
-                ("second",),
-                alignment.BoundingBox(0, 0, 20, 10),
+            alignment.AlignmentRegion(
+                region_id=1,
+                label="second",
+                json_geometry_path=("second_bbox",),
+                json_text_path=("second",),
+                input_geometry=alignment.BoundingBox(0, 0, 20, 10),
             ),
         )
 
@@ -341,9 +372,9 @@ class WordAssignmentTests(unittest.TestCase):
         )
 
         self.assertEqual(assigned[0].word_indexes, (1,))
-        self.assertEqual(assigned[0].extracted_text, "SECOND")
+        self.assertEqual(assigned[0].word_coverages, (0.9,))
         self.assertEqual(assigned[1].word_indexes, (0,))
-        self.assertEqual(assigned[1].extracted_text, "FIRST")
+        self.assertEqual(assigned[1].word_coverages, (0.8,))
 
     def test_all_over_threshold_retains_shared_words(self) -> None:
         coverages = (
@@ -360,26 +391,37 @@ class WordAssignmentTests(unittest.TestCase):
         self.assertEqual(assigned[0].word_indexes, (0,))
         self.assertEqual(assigned[1].word_indexes, (0,))
 
-    def test_text_builder_constructs_the_assigned_output(self) -> None:
+    def test_aligner_uses_builders_after_assignment(self) -> None:
         text_builder = mock.create_autospec(
             alignment.TextBuilder,
             instance=True,
         )
         text_builder.build.return_value = "CUSTOM TEXT"
-
-        assigned = alignment.GreatestCoverageWordAssigner(
-            text_builder=text_builder,
-        ).assign(
-            self.regions[:1],
-            self.words,
-            (
-                alignment.WordCoverage(0, 1, 0.9),
-                alignment.WordCoverage(0, 0, 0.8),
-            ),
+        geometry_builder = mock.create_autospec(
+            alignment.GeometryBuilder,
+            instance=True,
         )
+        geometry_builder.build.return_value = alignment.BoundingBox(
+            0, 0, 20, 10
+        )
+        aligner = alignment.GeometryAligner(
+            text_builder=text_builder,
+            geometry_builder=geometry_builder,
+        )
+        result = aligner.align_data(
+            _page(*self.words),
+            {"title_bbox": _bbox(2, width=17)},
+        )
+        region = result.pages[0].regions[0]
 
         text_builder.build.assert_called_once_with(self.words)
-        self.assertEqual(assigned[0].extracted_text, "CUSTOM TEXT")
+        geometry_builder.build.assert_called_once_with(self.words)
+        self.assertEqual(region.alto_text, "CUSTOM TEXT")
+        self.assertEqual(
+            region.alto_geometry,
+            alignment.BoundingBox(0, 0, 20, 10),
+        )
+        self.assertAlmostEqual(region.alignment_score or 0.0, 0.85)
 
 
 class TextBuilderTests(unittest.TestCase):
@@ -405,7 +447,8 @@ class GeometryAlignerTests(unittest.TestCase):
             _word(1, "MIDDLE", 10),
             _word(2, "LAST", 20),
         )
-        result = alignment.GeometryAligner().align_data(
+        aligner = alignment.GeometryAligner()
+        result = aligner.align_data(
             page,
             {
                 "outer_bbox": _bbox(0, width=30, height=8),
@@ -413,18 +456,25 @@ class GeometryAlignerTests(unittest.TestCase):
             },
         )
 
-        self.assertEqual(result.output_data["outer"], "FIRST LAST")
-        self.assertEqual(result.output_data["middle"], "MIDDLE")
-        self.assertEqual(result.alignments[0].word_indexes, (0, 2))
+        output = _output(aligner, result)
+        outer, middle = result.pages[0].regions
+        self.assertEqual(output["outer"], "FIRST LAST")
+        self.assertEqual(output["middle"], "MIDDLE")
+        self.assertEqual(
+            tuple(word.word_index for word in outer.words or ()),
+            (0, 2),
+        )
         self.assertAlmostEqual(
-            result.alignments[0].average_coverage,
+            outer.alignment_score or 0.0,
             0.8,
         )
+        self.assertEqual(middle.alto_text, "MIDDLE")
 
     def test_all_over_threshold_can_retain_shared_word(self) -> None:
-        result = alignment.GeometryAligner(
+        aligner = alignment.GeometryAligner(
             word_assignment_strategy="all-over-threshold"
-        ).align_data(
+        )
+        result = aligner.align_data(
             _page(_word(0, "WORD", 0)),
             {
                 "first_bbox": _bbox(0),
@@ -432,8 +482,9 @@ class GeometryAlignerTests(unittest.TestCase):
             },
         )
 
-        self.assertEqual(result.output_data["first"], "WORD")
-        self.assertEqual(result.output_data["second"], "WORD")
+        output = _output(aligner, result)
+        self.assertEqual(output["first"], "WORD")
+        self.assertEqual(output["second"], "WORD")
 
     def test_custom_text_builder_is_used_by_default_assigner(self) -> None:
         text_builder = mock.create_autospec(
@@ -442,40 +493,53 @@ class GeometryAlignerTests(unittest.TestCase):
         )
         text_builder.build.return_value = "BUILT"
 
-        result = alignment.GeometryAligner(
+        aligner = alignment.GeometryAligner(
             text_builder=text_builder,
-        ).align_data(
+        )
+        result = aligner.align_data(
             _page(_word(0, "WORD", 0)),
             {"title_bbox": _bbox(0)},
         )
 
-        self.assertEqual(result.output_data["title"], "BUILT")
+        self.assertEqual(_output(aligner, result)["title"], "BUILT")
 
-    def test_custom_assigner_and_text_builder_are_mutually_exclusive(
+    def test_custom_assigner_and_text_builder_are_independent_components(
         self,
     ) -> None:
-        with self.assertRaisesRegex(ValueError, "cannot be combined"):
-            alignment.GeometryAligner(
-                word_assigner=mock.create_autospec(
-                    alignment.GeometryWordAssigner,
-                    instance=True,
-                ),
-                text_builder=mock.create_autospec(
-                    alignment.TextBuilder,
-                    instance=True,
-                ),
-            )
+        assigner = mock.create_autospec(
+            alignment.GeometryWordAssigner,
+            instance=True,
+        )
+        text_builder = mock.create_autospec(
+            alignment.TextBuilder,
+            instance=True,
+        )
+        aligner = alignment.GeometryAligner(
+            word_assigner=assigner,
+            text_builder=text_builder,
+        )
+
+        self.assertIs(aligner.word_assigner, assigner)
+        self.assertIs(aligner.text_builder, text_builder)
 
     def test_unmatched_region_creates_null_and_render_score_zero(self) -> None:
-        result = alignment.GeometryAligner().align_data(
+        aligner = alignment.GeometryAligner()
+        result = aligner.align_data(
             _page(_word(0, "WORD", 0)),
             {"missing_bbox": _bbox(50)},
         )
 
-        self.assertIsNone(result.output_data["missing"])
-        self.assertEqual(result.unmatched_region_ids, (0,))
-        self.assertEqual(result.render_alignments[0].text, "null")
-        self.assertEqual(result.render_alignments[0].score, 0.0)
+        page = result.pages[0]
+        self.assertIsNone(_output(aligner, result)["missing"])
+        self.assertEqual(page.unmatched_count, 1)
+        rendered = alignment.PillowAlignmentRenderer._render_alignments(
+            page,
+            alignment.OutputTextSource.ALTO,
+            alignment.OutputGeometrySource.INPUT,
+            alignment.OutputGeometryFormat.BBOX,
+        )
+        self.assertEqual(rendered[0].text, "null")
+        self.assertEqual(rendered[0].score, 0.0)
 
     def test_existing_destination_is_skipped_before_overlap_calculation(
         self,
@@ -484,49 +548,57 @@ class GeometryAlignerTests(unittest.TestCase):
             alignment.GeometryOverlapCalculator,
             instance=True,
         )
-        result = alignment.GeometryAligner(
+        aligner = alignment.GeometryAligner(
             overlap_calculator=calculator,
-        ).align_data(
+        )
+        result = aligner.align_data(
             _page(_word(0, "WORD", 0)),
             {"title": "", "title_bbox": _bbox(0)},
         )
 
         calculator.calculate.assert_not_called()
-        self.assertEqual(result.regions, ())
-        self.assertEqual(result.output_data["title"], "")
+        self.assertEqual(result.pages[0].regions, [])
+        self.assertEqual(_output(aligner, result)["title"], "")
 
     def test_overwrite_processes_existing_destination(self) -> None:
-        result = alignment.GeometryAligner(
+        aligner = alignment.GeometryAligner(
             overwrite_existing_text=True
-        ).align_data(
+        )
+        result = aligner.align_data(
             _page(_word(0, "ALTO", 0)),
             {"title": "JSON", "title_bbox": _bbox(0)},
         )
 
-        self.assertEqual(result.output_data["title"], "ALTO")
+        self.assertEqual(_output(aligner, result)["title"], "ALTO")
 
     def test_overwrite_replaces_existing_text_with_null_when_unmatched(
         self,
     ) -> None:
-        result = alignment.GeometryAligner(
+        aligner = alignment.GeometryAligner(
             overwrite_existing_text=True
-        ).align_data(
+        )
+        result = aligner.align_data(
             _page(_word(0, "ALTO", 0)),
             {"title": "JSON", "title_bbox": _bbox(50)},
         )
 
-        self.assertIsNone(result.output_data["title"])
+        self.assertIsNone(_output(aligner, result)["title"])
 
     def test_geometry_render_label_uses_average_coverage(self) -> None:
-        result = alignment.GeometryAligner().align_data(
+        aligner = alignment.GeometryAligner()
+        result = aligner.align_data(
             _page(_word(0, "WORD", 0)),
             {"title_bbox": _bbox(0, width=8)},
         )
 
+        rendered = alignment.PillowAlignmentRenderer._render_alignments(
+            result.pages[0],
+            alignment.OutputTextSource.ALTO,
+            alignment.OutputGeometrySource.INPUT,
+            alignment.OutputGeometryFormat.BBOX,
+        )
         self.assertEqual(
-            alignment.PillowAlignmentRenderer()._build_label(
-                result.render_alignments[0]
-            ),
+            alignment.PillowAlignmentRenderer()._build_label(rendered[0]),
             "WORD [0.80]",
         )
 
@@ -537,13 +609,18 @@ class GeometryArgumentParserTests(unittest.TestCase):
         required = [
             "--alto-dir",
             "alto",
-            "--json-input-dir",
+            "--input-dir",
             "json",
             "--json-output-dir",
             "output",
         ]
 
         defaults = parser.parse_args(required)
+        option_strings = {
+            option
+            for action in parser._actions
+            for option in action.option_strings
+        }
         all_matches = parser.parse_args(
             [
                 *required,
@@ -553,8 +630,10 @@ class GeometryArgumentParserTests(unittest.TestCase):
                 "0.4",
                 "--word-assignment-strategy",
                 "all-over-threshold",
-                "--text-builder",
+                "--output-alto-text-format",
                 "space-separated",
+                "--output-alto-geometry-format",
+                "polygon",
                 "--overwrite-existing-text",
             ]
         )
@@ -565,7 +644,16 @@ class GeometryArgumentParserTests(unittest.TestCase):
             defaults.word_assignment_strategy,
             "greatest-coverage",
         )
-        self.assertEqual(defaults.text_builder, "space-separated")
+        self.assertEqual(
+            defaults.output_alto_text_format,
+            "space-separated",
+        )
+        self.assertEqual(
+            defaults.output_alto_geometry_format,
+            "bbox",
+        )
+        self.assertNotIn("--text-builder", option_strings)
+        self.assertNotIn("--output-geometry-format", option_strings)
         self.assertFalse(defaults.overwrite_existing_text)
         self.assertEqual(all_matches.geometry_suffix, "_polygon")
         self.assertEqual(all_matches.minimum_word_coverage, 0.4)
@@ -573,7 +661,14 @@ class GeometryArgumentParserTests(unittest.TestCase):
             all_matches.word_assignment_strategy,
             "all-over-threshold",
         )
-        self.assertEqual(all_matches.text_builder, "space-separated")
+        self.assertEqual(
+            all_matches.output_alto_text_format,
+            "space-separated",
+        )
+        self.assertEqual(
+            all_matches.output_alto_geometry_format,
+            "polygon",
+        )
         self.assertTrue(all_matches.overwrite_existing_text)
 
     def test_invalid_strategy_is_rejected(self) -> None:
@@ -586,7 +681,7 @@ class GeometryArgumentParserTests(unittest.TestCase):
                 [
                     "--alto-dir",
                     "alto",
-                    "--json-input-dir",
+                    "--input-dir",
                     "json",
                     "--json-output-dir",
                     "output",
@@ -595,7 +690,7 @@ class GeometryArgumentParserTests(unittest.TestCase):
                 ]
             )
 
-    def test_invalid_text_builder_is_rejected(self) -> None:
+    def test_invalid_alto_text_format_is_rejected(self) -> None:
         parser = geometry_aligner_module.build_argument_parser()
         with (
             self.assertRaises(SystemExit),
@@ -605,17 +700,17 @@ class GeometryArgumentParserTests(unittest.TestCase):
                 [
                     "--alto-dir",
                     "alto",
-                    "--json-input-dir",
+                    "--input-dir",
                     "json",
                     "--json-output-dir",
                     "output",
-                    "--text-builder",
+                    "--output-alto-text-format",
                     "unknown",
                 ]
             )
 
-    def test_cli_text_builder_resolution(self) -> None:
-        builder = geometry_aligner_module._build_text_builder(
+    def test_cli_alto_builder_resolution(self) -> None:
+        builder = base_aligner_module._build_text_builder(
             "space-separated"
         )
 
@@ -623,8 +718,17 @@ class GeometryArgumentParserTests(unittest.TestCase):
             builder,
             alignment.SpaceSeparatedTextBuilder,
         )
-        with self.assertRaisesRegex(ValueError, "Unsupported text builder"):
-            geometry_aligner_module._build_text_builder("unknown")
+        self.assertIsInstance(
+            base_aligner_module._build_geometry_builder(
+                alignment.OutputGeometryFormat.POLYGON
+            ),
+            alignment.OrthogonalPolygonGeometryBuilder,
+        )
+        with self.assertRaisesRegex(
+            ValueError,
+            "Unsupported output ALTO text format",
+        ):
+            base_aligner_module._build_text_builder("unknown")
 
 
 class RefactorAPITests(unittest.TestCase):

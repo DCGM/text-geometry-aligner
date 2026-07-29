@@ -3,20 +3,48 @@ from __future__ import annotations
 import logging
 import os
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional, Sequence
 
 from .models import (
-    ALTOPage,
+    AlignmentPage,
     BoundingBox,
-    GeometryAlignmentResult,
     OutputGeometry,
+    OutputGeometryFormat,
+    OutputGeometrySource,
+    OutputTextSource,
     Polygon,
-    RenderAlignment,
-    TextAlignmentResult,
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _convert_geometry(
+    geometry: OutputGeometry,
+    output_format: OutputGeometryFormat,
+) -> OutputGeometry:
+    if output_format is OutputGeometryFormat.BBOX:
+        return geometry.bounds
+    if isinstance(geometry, Polygon):
+        return geometry
+    return Polygon(
+        (
+            (geometry.x, geometry.y),
+            (geometry.x_max, geometry.y),
+            (geometry.x_max, geometry.y_max),
+            (geometry.x, geometry.y_max),
+            (geometry.x, geometry.y),
+        )
+    )
+
+
+@dataclass(frozen=True)
+class RenderAlignment:
+    alignment_id: int
+    geometry: OutputGeometry
+    text: str
+    score: float
 
 
 class AlignmentRenderer(ABC):
@@ -27,8 +55,15 @@ class AlignmentRenderer(ABC):
         self,
         image_path: str | os.PathLike[str],
         output_path: str | os.PathLike[str],
-        alto_page: ALTOPage,
-        result: TextAlignmentResult | GeometryAlignmentResult,
+        page: AlignmentPage,
+        *,
+        output_text_source: OutputTextSource = OutputTextSource.JSON,
+        output_geometry_source: OutputGeometrySource = (
+            OutputGeometrySource.ALTO
+        ),
+        output_geometry_format: OutputGeometryFormat = (
+            OutputGeometryFormat.BBOX
+        ),
     ) -> None:
         raise NotImplementedError
 
@@ -36,10 +71,10 @@ class PillowAlignmentRenderer(AlignmentRenderer):
     """Render selected geometries and labels using Pillow.
 
     ALTO coordinates are scaled to the actual image dimensions when page
-    dimensions are present in the ALTO file. Each label contains the original
-    JSON text and the candidate similarity score. Exact candidates currently
-    have a similarity of 1.0, while the same rendering API can later display
-    fuzzy scores without modification.
+    dimensions are present in the ALTO file. Text and geometry are selected
+    independently from the input or ALTO-derived region fields. Labels show
+    text similarity for text alignment and average word coverage for geometry
+    alignment.
 
     Pillow is used for all drawing so labels can render Unicode text when the
     selected font contains the required glyphs.
@@ -86,8 +121,15 @@ class PillowAlignmentRenderer(AlignmentRenderer):
         self,
         image_path: str | os.PathLike[str],
         output_path: str | os.PathLike[str],
-        alto_page: ALTOPage,
-        result: TextAlignmentResult | GeometryAlignmentResult,
+        page: AlignmentPage,
+        *,
+        output_text_source: OutputTextSource = OutputTextSource.JSON,
+        output_geometry_source: OutputGeometrySource = (
+            OutputGeometrySource.ALTO
+        ),
+        output_geometry_format: OutputGeometryFormat = (
+            OutputGeometryFormat.BBOX
+        ),
     ) -> None:
         try:
             from PIL import Image, ImageDraw
@@ -109,13 +151,18 @@ class PillowAlignmentRenderer(AlignmentRenderer):
         font = self._load_font()
         image_width, image_height = image.size
         scale_x, scale_y = self._coordinate_scale(
-            alto_page,
+            page,
             image_width,
             image_height,
         )
 
         ordered_alignments = sorted(
-            result.render_alignments,
+            self._render_alignments(
+                page,
+                output_text_source,
+                output_geometry_source,
+                output_geometry_format,
+            ),
             key=lambda alignment: (
                 alignment.geometry.bounds.y,
                 alignment.geometry.bounds.x,
@@ -197,7 +244,9 @@ class PillowAlignmentRenderer(AlignmentRenderer):
         try:
             image.save(destination_path)
         except OSError as exc:
-            raise RuntimeError(f"Pillow could not write rendered image: {destination_path}") from exc
+            raise RuntimeError(
+                f"Pillow could not write rendered image: {destination_path}"
+            ) from exc
 
         logger.info(
             "Rendered %d alignments to %s",
@@ -236,29 +285,64 @@ class PillowAlignmentRenderer(AlignmentRenderer):
 
     @staticmethod
     def _coordinate_scale(
-        alto_page: ALTOPage,
+        page: AlignmentPage,
         image_width: int,
         image_height: int,
     ) -> tuple[float, float]:
-        if alto_page.width and alto_page.width > 0:
-            scale_x = image_width / alto_page.width
+        if page.alto_width and page.alto_width > 0:
+            scale_x = image_width / page.alto_width
         else:
             scale_x = 1.0
             logger.warning(
                 "ALTO page width is missing for %s; using unscaled x coordinates",
-                alto_page.source_path,
+                page.alto_file_path,
             )
 
-        if alto_page.height and alto_page.height > 0:
-            scale_y = image_height / alto_page.height
+        if page.alto_height and page.alto_height > 0:
+            scale_y = image_height / page.alto_height
         else:
             scale_y = 1.0
             logger.warning(
                 "ALTO page height is missing for %s; using unscaled y coordinates",
-                alto_page.source_path,
+                page.alto_file_path,
             )
 
         return scale_x, scale_y
+
+    @staticmethod
+    def _render_alignments(
+        page: AlignmentPage,
+        output_text_source: OutputTextSource,
+        output_geometry_source: OutputGeometrySource,
+        output_geometry_format: OutputGeometryFormat,
+    ) -> tuple[RenderAlignment, ...]:
+        alignments: list[RenderAlignment] = []
+        for region in page.regions:
+            geometry = (
+                region.input_geometry
+                if output_geometry_source is OutputGeometrySource.INPUT
+                else region.alto_geometry
+            )
+            if geometry is None:
+                continue
+            geometry = _convert_geometry(
+                geometry,
+                output_geometry_format,
+            )
+            text_value = (
+                region.input_text
+                if output_text_source is OutputTextSource.JSON
+                else region.alto_text
+            )
+            alignments.append(
+                RenderAlignment(
+                    alignment_id=region.region_id,
+                    geometry=geometry,
+                    text="null" if text_value is None else str(text_value),
+                    score=region.alignment_score or 0.0,
+                )
+            )
+        return tuple(alignments)
 
     @staticmethod
     def _scaled_box(

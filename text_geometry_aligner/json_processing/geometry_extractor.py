@@ -1,12 +1,16 @@
 from __future__ import annotations
 
+import copy
 import math
 from numbers import Real
+from pathlib import Path
 from typing import Any
 
 from ..models import (
+    AlignmentPage,
+    AlignmentRegion,
     BoundingBox,
-    JSONGeometryRegion,
+    InputFormat,
     JSONPath,
     Point,
     Polygon,
@@ -27,11 +31,14 @@ class JSONGeometryExtractor:
         self.geometry_suffix = geometry_suffix
         self.overwrite_existing_text = overwrite_existing_text
 
-    def extract(self, data: Any) -> tuple[JSONGeometryRegion, ...]:
+    def extract_alignment_region(
+        self,
+        data: Any,
+    ) -> tuple[AlignmentRegion, ...]:
         if not isinstance(data, dict):
             raise TypeError("Geometry-alignment JSON root must be an object")
 
-        regions: list[JSONGeometryRegion] = []
+        regions: list[AlignmentRegion] = []
 
         def visit_document(node: Any, path: JSONPath) -> None:
             if isinstance(node, dict):
@@ -74,11 +81,18 @@ class JSONGeometryExtractor:
             geometry = _parse_geometry_or_none(node, geometry_path)
             if geometry is not None:
                 regions.append(
-                    JSONGeometryRegion(
+                    AlignmentRegion(
                         region_id=len(regions),
-                        geometry_path=geometry_path,
-                        text_path=text_path,
-                        geometry=geometry,
+                        label=_path_label(text_path),
+                        input_text=(
+                            destination
+                            if isinstance(destination, (str, int, float))
+                            and not isinstance(destination, bool)
+                            else None
+                        ),
+                        input_geometry=geometry,
+                        json_geometry_path=geometry_path,
+                        json_text_path=text_path,
                     )
                 )
                 return
@@ -100,6 +114,23 @@ class JSONGeometryExtractor:
         visit_document(data, ())
         return tuple(regions)
 
+    def extract_alignment_page(
+        self,
+        data: Any,
+        *,
+        page_key: str,
+        input_file_path: Path | None = None,
+    ) -> AlignmentPage:
+        """Extract geometries and wrap them in one JSON alignment page."""
+
+        return AlignmentPage(
+            page_key=page_key,
+            input_format=InputFormat.JSON,
+            regions=list(self.extract_alignment_region(data)),
+            input_file_path=input_file_path,
+            json_source_data=copy.deepcopy(data),
+        )
+
 
 def _parse_geometry_or_none(
     value: Any,
@@ -110,6 +141,15 @@ def _parse_geometry_or_none(
     if _is_point_sequence(value):
         return _parse_polygon(value, path)
     return None
+
+
+def _path_label(path: JSONPath) -> str:
+    for component in reversed(path):
+        if isinstance(component, str):
+            return component
+    raise ValueError(
+        f"No JSON object key is available at {_format_json_path(path)}"
+    )
 
 
 def _parse_bounding_box(

@@ -5,12 +5,12 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Sequence
 
-from ..models import OCRWord
+from ..alto_io import ALTOWord
 
 
 class TextBuilder(ABC):
-    """Convert matched OCR words into output text."""
+    """Convert matched ALTO words into output text."""
 
     @abstractmethod
-    def build(self, words: Sequence[OCRWord]) -> str | None:
+    def build(self, words: Sequence[ALTOWord]) -> str | None:
         raise NotImplementedError

@@ -5,7 +5,8 @@ from __future__ import annotations
 from typing import Sequence
 
 from ...alto_processing import ALTOTextIndex
-from ...models import AlignmentCandidate, JSONScalarValue
+from ...models import AlignmentRegion
+from ..candidate import AlignmentCandidate
 from .base import CandidateGenerator
 from .utils import candidate_sort_key, replace_candidate_id
 
@@ -20,14 +21,14 @@ class CompositeCandidateGenerator(CandidateGenerator):
 
     def generate(
         self,
-        values: Sequence[JSONScalarValue],
+        regions: Sequence[AlignmentRegion],
         alto_index: ALTOTextIndex,
     ) -> tuple[AlignmentCandidate, ...]:
         by_value_and_span: dict[tuple[int, int, int], AlignmentCandidate] = {}
         for generator in self.generators:
-            for candidate in generator.generate(values, alto_index):
+            for candidate in generator.generate(regions, alto_index):
                 key = (
-                    candidate.value_id,
+                    candidate.region_id,
                     candidate.start_word,
                     candidate.end_word,
                 )

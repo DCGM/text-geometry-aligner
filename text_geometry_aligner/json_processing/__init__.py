@@ -1,13 +1,11 @@
-"""In-memory JSON extraction and alignment-result merging."""
+"""Create alignment pages from JSON and export enriched pages to JSON."""
 
+from .alignment_exporter import AlignmentJSONExporter
 from .geometry_extractor import JSONGeometryExtractor
-from .geometry_merger import JSONGeometryMerger
 from .text_extractor import JSONTextExtractor
-from .text_merger import JSONTextMerger
 
 __all__ = [
+    "AlignmentJSONExporter",
     "JSONGeometryExtractor",
-    "JSONGeometryMerger",
     "JSONTextExtractor",
-    "JSONTextMerger",
 ]

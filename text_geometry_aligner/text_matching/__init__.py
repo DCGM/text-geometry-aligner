@@ -1,5 +1,10 @@
 """Text candidate generation, global selection, and diagnostics."""
 
+from .candidate import (
+    CER_SCALE,
+    SIMILARITY_SCALE,
+    AlignmentCandidate,
+)
 from .candidate_generators import (
     AnchoredFuzzyTextCandidateGenerator,
     CandidateGenerator,
@@ -16,9 +21,10 @@ from .candidate_selectors import (
 )
 
 __all__ = [
-    "AnchoredFuzzyTextCandidateGenerator", "CandidateGenerator",
+    "AlignmentCandidate", "AnchoredFuzzyTextCandidateGenerator",
+    "CER_SCALE", "CandidateGenerator", "CandidateSelector",
     "CompositeCandidateGenerator", "CPSATCandidateSelector",
-    "CandidateSelector", "ExactTextCandidateGenerator",
-    "FuzzyCandidateConfig", "OrderedAlignmentCandidateConfig",
-    "OrderedAlignmentCandidateGenerator", "PassThroughCandidateSelector",
+    "ExactTextCandidateGenerator", "FuzzyCandidateConfig",
+    "OrderedAlignmentCandidateConfig", "OrderedAlignmentCandidateGenerator",
+    "PassThroughCandidateSelector", "SIMILARITY_SCALE",
 ]
