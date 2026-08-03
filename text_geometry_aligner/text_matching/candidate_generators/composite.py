@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Sequence
 
-from ...alto_processing import ALTOTextIndex
+from ..alto_text_index import ALTOTextIndex
 from ...models import AlignmentRegion
 from ..candidate import AlignmentCandidate
 from .base import CandidateGenerator

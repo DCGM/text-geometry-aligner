@@ -588,10 +588,10 @@ skipping them.
 
 | Area | Responsibility and primary extension points |
 | --- | --- |
-| `alto_io`, `alto_processing` | Read ALTO and create its normalized text index |
+| `alto_io` | Read ALTO into the internal word-level representation |
 | `json_io`, `json_processing` | Read/write JSON, create pages with retained paths, and export enriched pages |
 | `yolo_io`, `yolo_processing` | Read absolute YOLO detections and create geometry regions |
-| `text_matching` | `CandidateGenerator` and `CandidateSelector` implementations |
+| `text_matching` | Normalized ALTO text indexing, candidate generation, and candidate selection |
 | `geometry_matching` | `GeometryOverlapCalculator` and `GeometryWordAssigner` implementations |
 | `geometry_building` | `GeometryBuilder` implementations used directly by both aligners |
 | `text_building` | `TextBuilder` implementations used directly by both aligners |

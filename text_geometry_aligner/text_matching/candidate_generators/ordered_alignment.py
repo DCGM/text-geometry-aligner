@@ -6,7 +6,7 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass
 from typing import Any, Optional, Sequence
 
-from ...alto_processing import ALTOTextIndex
+from ..alto_text_index import ALTOTextIndex
 from ...models import AlignmentRegion
 from ..candidate import (
     CER_SCALE,

@@ -1766,7 +1766,7 @@ class ArgumentParserTests(unittest.TestCase):
         )
         self.assertEqual(
             alignment.ALTOWordSpan.__module__,
-            "text_geometry_aligner.alto_processing.text_index",
+            "text_geometry_aligner.text_matching.alto_text_index",
         )
         self.assertFalse(hasattr(alignment, "OCRWordSpan"))
 
@@ -1777,7 +1777,7 @@ class ArgumentParserTests(unittest.TestCase):
         )
         self.assertEqual(
             alignment.ALTOTextIndex.__module__,
-            "text_geometry_aligner.alto_processing.text_index",
+            "text_geometry_aligner.text_matching.alto_text_index",
         )
         self.assertEqual(
             alignment.JSONReader.__module__,

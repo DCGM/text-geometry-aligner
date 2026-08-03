@@ -5,7 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Sequence
 
-from ...alto_processing import ALTOTextIndex
+from ..alto_text_index import ALTOTextIndex
 from ...models import AlignmentRegion
 from ..candidate import AlignmentCandidate
 

@@ -10,7 +10,6 @@ from typing import Any
 
 import text_geometry_aligner.base_aligner as base_aligner_module
 from text_geometry_aligner.alto_io import ALTOPage, ALTOReader
-from text_geometry_aligner.alto_processing import ALTOTextIndex
 from text_geometry_aligner.base_aligner import (
     BaseAligner,
     add_common_cli_arguments,
@@ -44,6 +43,7 @@ from text_geometry_aligner.text_building import (
     TextBuilder,
 )
 from text_geometry_aligner.text_matching import (
+    ALTOTextIndex,
     CER_SCALE,
     SIMILARITY_SCALE,
 )

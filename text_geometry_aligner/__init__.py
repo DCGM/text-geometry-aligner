@@ -1,7 +1,6 @@
 """Bidirectional text/geometry alignment against word-level ALTO OCR."""
 
 from .alto_io import ALTOPage, ALTOReader, ALTOWord
-from .alto_processing import ALTOTextIndex, ALTOWordSpan
 from .base_aligner import BaseAligner
 from .geometry_building import (
     GeometryBuilder,
@@ -58,6 +57,8 @@ from .normalization import (
 from .rendering import AlignmentRenderer, PillowAlignmentRenderer
 from .text_building import SpaceSeparatedTextBuilder, TextBuilder
 from .text_matching import (
+    ALTOTextIndex,
+    ALTOWordSpan,
     CER_SCALE,
     SIMILARITY_SCALE,
     AlignmentCandidate,
