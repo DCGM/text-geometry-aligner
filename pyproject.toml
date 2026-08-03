@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "text-geometry-aligner"
+version = "0.1.0"
+description = "Bidirectional text and geometry alignment against ALTO OCR"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "Levenshtein~=0.27.3",
+    "ortools~=9.14.6206",
+    "Pillow~=10.0.1",
+    "Shapely~=2.1.2",
+]
+
+[tool.setuptools.packages.find]
+include = ["text_geometry_aligner*"]

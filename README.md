@@ -47,10 +47,10 @@ because their output JSON is constructed from the regions.
 
 ## Installation
 
-Install the package dependencies from this repository:
+Install the package in editable mode from this repository:
 
 ```bash
-python -m pip install -r requirements.txt
+python -m pip install -e .
 ```
 
 The dependency roles are:
