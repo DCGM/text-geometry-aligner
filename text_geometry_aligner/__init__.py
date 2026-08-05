@@ -27,6 +27,7 @@ from .io_json import (
     JSONGeometryReader,
     JSONTextReader,
 )
+from .io_label_studio import LabelStudioReader, LabelStudioWriter
 from .models import (
     AlignmentDocument,
     AlignmentMode,
@@ -128,6 +129,8 @@ __all__ = [
     "JSONGeometryReader",
     "JSONPath",
     "JSONTextReader",
+    "LabelStudioReader",
+    "LabelStudioWriter",
     "LowercaseTextNormalizer",
     "ALTOWordSpan",
     "OrthogonalPolygonGeometryBuilder",

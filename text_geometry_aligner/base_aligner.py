@@ -6,6 +6,7 @@ import os
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from pathlib import Path
+from typing import Any, Protocol
 
 from .io_alto import ALTOPage, ALTOReader
 from .geometry_building import (
@@ -13,7 +14,6 @@ from .geometry_building import (
     OrthogonalPolygonGeometryBuilder,
     UnionBoundingBoxGeometryBuilder,
 )
-from .io_json import AlignmentJSONWriter
 from .models import (
     AlignmentDocument,
     AlignmentMode,
@@ -29,6 +29,7 @@ from .text_building import SpaceSeparatedTextBuilder, TextBuilder
 logger = logging.getLogger(__name__)
 
 ALTO_TEXT_FORMAT_CHOICES = ("space-separated",)
+JSON_OUTPUT_FORMAT_CHOICES = ("package", "label-studio")
 
 IMAGE_EXTENSIONS = {
     ".bmp",
@@ -40,6 +41,18 @@ IMAGE_EXTENSIONS = {
     ".tiff",
     ".webp",
 }
+
+
+class AlignmentPageWriter(Protocol):
+    """Writer contract used by alignment workflows."""
+
+    def to_data(self, page: AlignmentPage) -> dict[str, Any]: ...
+
+    def write(
+        self,
+        page: AlignmentPage,
+        output_path: str | os.PathLike[str],
+    ) -> None: ...
 
 
 def _build_text_builder(output_format: str) -> TextBuilder:
@@ -71,7 +84,7 @@ class BaseAligner(ABC):
     def __init__(
         self,
         *,
-        json_writer: AlignmentJSONWriter,
+        json_writer: AlignmentPageWriter,
         alto_reader: ALTOReader | None = None,
         output_geometry_format: OutputGeometryFormat | str = (
             OutputGeometryFormat.BBOX
@@ -409,6 +422,17 @@ def add_common_cli_arguments(
         help="Directory for aligned output JSON files",
     )
     parser.add_argument(
+        "--output-json-format",
+        choices=JSON_OUTPUT_FORMAT_CHOICES,
+        default="package",
+        help="Output package or Label Studio JSON (default: package)",
+    )
+    parser.add_argument(
+        "--label-studio-image-prefix",
+        default=None,
+        help="Image reference prefix for Label Studio output",
+    )
+    parser.add_argument(
         "--output-alto-text-format",
         choices=ALTO_TEXT_FORMAT_CHOICES,
         default="space-separated",
@@ -443,6 +467,17 @@ def validate_common_cli_arguments(
 ) -> None:
     if (args.images_dir is None) != (args.render_dir is None):
         parser.error("--images-dir and --render-dir must be provided together")
+    if (
+        args.output_json_format == "label-studio"
+        and (
+            args.label_studio_image_prefix is None
+            or not args.label_studio_image_prefix.strip()
+        )
+    ):
+        parser.error(
+            "--label-studio-image-prefix is required when "
+            "--output-json-format=label-studio"
+        )
 
 
 def _page_key(path: Path) -> str:

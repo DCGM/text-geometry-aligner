@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import json
+import logging
 import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
 
 import text_geometry_aligner as alignment
+from text_geometry_aligner import models as models_module
 
 
 def _alto_xml(word: str) -> str:
@@ -29,6 +31,70 @@ def _alto_xml(word: str) -> str:
 
 
 class SharedAlignmentModelTests(unittest.TestCase):
+    def test_normal_input_geometry_does_not_warn(self) -> None:
+        with self.assertNoLogs(models_module.logger, logging.WARNING):
+            alignment.AlignmentRegion(
+                region_id=0,
+                label="Title",
+                input_geometry=alignment.BoundingBox(0, 0, 10, 10),
+            )
+
+    def test_suspicious_geometry_warning_combines_source_details(self) -> None:
+        with self.assertLogs(
+            models_module.logger,
+            logging.WARNING,
+        ) as captured:
+            alignment.AlignmentRegion(
+                region_id=7,
+                label="Page Number",
+                input_geometry=alignment.BoundingBox(-1, -2, 2, 3),
+                category_id=4,
+                json_geometry_path=("groups", 0, "number_bbox"),
+                json_text_path=("groups", 0, "number"),
+            )
+
+        self.assertEqual(len(captured.records), 1)
+        warning = captured.records[0].getMessage()
+        self.assertIn("region_id=7", warning)
+        self.assertIn("label='Page Number'", warning)
+        self.assertIn("category_id=4", warning)
+        self.assertIn(
+            "json_geometry_path='$.groups[0].number_bbox'",
+            warning,
+        )
+        self.assertIn("json_text_path='$.groups[0].number'", warning)
+        self.assertIn("negative coordinates", warning)
+        self.assertIn("width=2 is below 5", warning)
+        self.assertIn("height=3 is below 5", warning)
+        self.assertIn("area=6 is below 100", warning)
+
+    def test_polygon_area_and_non_finite_values_warn(self) -> None:
+        with self.assertLogs(
+            models_module.logger,
+            logging.WARNING,
+        ) as captured:
+            alignment.AlignmentRegion(
+                region_id=0,
+                label="Triangle",
+                input_geometry=alignment.Polygon(
+                    ((0, 0), (10, 0), (0, 10), (0, 0))
+                ),
+            )
+            alignment.AlignmentRegion(
+                region_id=1,
+                label="NonFinite",
+                input_geometry=alignment.BoundingBox(
+                    0,
+                    0,
+                    float("inf"),
+                    10,
+                ),
+            )
+
+        self.assertEqual(len(captured.records), 2)
+        self.assertIn("area=50 is below 100", captured.output[0])
+        self.assertIn("non-finite values: width=inf", captured.output[1])
+
     def test_input_region_is_populated_in_place(self) -> None:
         input_geometry = alignment.BoundingBox(10, 20, 30, 10)
         region = alignment.AlignmentRegion(
@@ -143,6 +209,36 @@ class SharedAlignmentModelTests(unittest.TestCase):
 
 
 class YOLOAdapterTests(unittest.TestCase):
+    def test_reader_logs_page_before_suspicious_region_warning(self) -> None:
+        with self.assertLogs(
+            "text_geometry_aligner",
+            logging.INFO,
+        ) as captured:
+            alignment.YOLOReader().from_data(
+                [
+                    alignment.YOLODetection(
+                        category_id=3,
+                        center_x=0,
+                        center_y=0,
+                        width=2,
+                        height=3,
+                        confidence=0.875,
+                        class_name="Page Number",
+                    )
+                ],
+                page_key="memory-page",
+            )
+
+        self.assertEqual(len(captured.records), 2)
+        self.assertEqual(captured.records[0].levelno, logging.INFO)
+        self.assertIn(
+            "Loading YOLO geometry page 'memory-page' from in-memory data",
+            captured.records[0].getMessage(),
+        )
+        self.assertEqual(captured.records[1].levelno, logging.WARNING)
+        self.assertIn("label='Page Number'", captured.records[1].getMessage())
+        self.assertIn("category_id=3", captured.records[1].getMessage())
+
     def test_reader_accepts_in_memory_detections(self) -> None:
         page = alignment.YOLOReader().from_data(
             [
@@ -174,12 +270,20 @@ class YOLOAdapterTests(unittest.TestCase):
                 "3 25 30 30 10 0.875 Page Number\n",
                 encoding="utf-8",
             )
-            page = alignment.YOLOReader().read(
-                path,
-                page_key="page",
-            )
+            with self.assertLogs(
+                "text_geometry_aligner.io_yolo.reader",
+                logging.INFO,
+            ) as captured:
+                page = alignment.YOLOReader().read(
+                    path,
+                    page_key="page",
+                )
 
         region = page.regions[0]
+        self.assertIn(
+            f"Loading YOLO geometry page 'page' from {path}",
+            captured.records[0].getMessage(),
+        )
         self.assertIs(page.input_format, alignment.InputFormat.YOLO)
         self.assertIsNone(page.json_source_data)
         self.assertEqual(region.label, "Page Number")

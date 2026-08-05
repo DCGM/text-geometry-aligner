@@ -10,8 +10,8 @@ from ..models import (
     AlignmentRegion,
     BoundingBox,
     Polygon,
+    _format_json_path,
 )
-from ..utils import _format_json_path
 
 
 class GeometryOverlapStrategy(str, Enum):

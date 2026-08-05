@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import math
 import os
 from collections.abc import Sequence
@@ -14,6 +15,8 @@ from ..models import (
     BoundingBox,
     InputFormat,
 )
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -56,6 +59,11 @@ class YOLOReader:
     ) -> AlignmentPage:
         """Convert in-memory YOLO detections into an alignment page."""
 
+        logger.info(
+            "Loading YOLO geometry page %r from %s",
+            page_key,
+            input_file_path or "in-memory data",
+        )
         return AlignmentPage(
             page_key=page_key,
             input_format=InputFormat.YOLO,

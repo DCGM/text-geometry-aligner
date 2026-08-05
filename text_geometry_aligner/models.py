@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import logging
 import math
 from dataclasses import dataclass, field
 from enum import Enum
@@ -11,6 +13,27 @@ if TYPE_CHECKING:
 JSONPathPart = str | int
 JSONPath = tuple[JSONPathPart, ...]
 ScalarText = str | int | float
+
+_SUSPICIOUS_INPUT_GEOMETRY_MIN_WIDTH = 5.0
+_SUSPICIOUS_INPUT_GEOMETRY_MIN_HEIGHT = 5.0
+_SUSPICIOUS_INPUT_GEOMETRY_MIN_AREA = 100.0
+
+logger = logging.getLogger(__name__)
+
+
+def _format_json_path(path: JSONPath) -> str:
+    if not path:
+        return "$"
+
+    output = "$"
+    for component in path:
+        if isinstance(component, int):
+            output += f"[{component}]"
+        elif component.isidentifier():
+            output += f".{component}"
+        else:
+            output += f"[{json.dumps(component, ensure_ascii=False)}]"
+    return output
 
 
 class AlignmentMode(str, Enum):
@@ -24,6 +47,7 @@ class InputFormat(str, Enum):
     """Supported sources from which alignment regions can be created."""
 
     JSON = "json"
+    LABEL_STUDIO = "label_studio"
     YOLO = "yolo"
 
 
@@ -171,12 +195,130 @@ class AlignmentRegion:
             raise ValueError(
                 "input_geometry_confidence must be within [0, 1]"
             )
-        if self.alignment_score is not None and not 0.0 <= self.alignment_score <= 1.0:
+        if (
+            self.alignment_score is not None
+            and not 0.0 <= self.alignment_score <= 1.0
+        ):
             raise ValueError("alignment_score must be within [0, 1]")
+        self._warn_about_suspicious_input_geometry()
+
+    def _warn_about_suspicious_input_geometry(self) -> None:
+        geometry = self.input_geometry
+        if geometry is None:
+            return
+
+        reasons: list[str] = []
+        coordinate_values = _geometry_coordinate_values(geometry)
+        non_finite_values = [
+            f"{name}={value!r}"
+            for name, value in coordinate_values
+            if not math.isfinite(value)
+        ]
+        if non_finite_values:
+            reasons.append(
+                "non-finite values: " + ", ".join(non_finite_values)
+            )
+
+        negative_coordinates = [
+            f"{name}={value:g}"
+            for name, value in coordinate_values
+            if math.isfinite(value)
+            and _is_coordinate_name(name)
+            and value < 0
+        ]
+        if negative_coordinates:
+            reasons.append(
+                "negative coordinates: " + ", ".join(negative_coordinates)
+            )
+
+        bounds = geometry.bounds
+        if (
+            math.isfinite(bounds.width)
+            and bounds.width < _SUSPICIOUS_INPUT_GEOMETRY_MIN_WIDTH
+        ):
+            reasons.append(
+                f"width={bounds.width:g} is below "
+                f"{_SUSPICIOUS_INPUT_GEOMETRY_MIN_WIDTH:g}"
+            )
+        if (
+            math.isfinite(bounds.height)
+            and bounds.height < _SUSPICIOUS_INPUT_GEOMETRY_MIN_HEIGHT
+        ):
+            reasons.append(
+                f"height={bounds.height:g} is below "
+                f"{_SUSPICIOUS_INPUT_GEOMETRY_MIN_HEIGHT:g}"
+            )
+
+        area = _geometry_area(geometry)
+        if (
+            math.isfinite(area)
+            and area < _SUSPICIOUS_INPUT_GEOMETRY_MIN_AREA
+        ):
+            reasons.append(
+                f"area={area:g} is below "
+                f"{_SUSPICIOUS_INPUT_GEOMETRY_MIN_AREA:g}"
+            )
+
+        if not reasons:
+            return
+
+        json_geometry_path = (
+            None
+            if self.json_geometry_path is None
+            else _format_json_path(self.json_geometry_path)
+        )
+        json_text_path = (
+            None
+            if self.json_text_path is None
+            else _format_json_path(self.json_text_path)
+        )
+        logger.warning(
+            "Suspicious input geometry for region_id=%d label=%r "
+            "category_id=%r json_geometry_path=%r json_text_path=%r: %r; "
+            "reasons: %s",
+            self.region_id,
+            self.label,
+            self.category_id,
+            json_geometry_path,
+            json_text_path,
+            geometry,
+            "; ".join(reasons),
+        )
 
     @property
     def matched(self) -> bool:
         return self.words is not None
+
+
+def _geometry_coordinate_values(
+    geometry: OutputGeometry,
+) -> tuple[tuple[str, float], ...]:
+    if isinstance(geometry, BoundingBox):
+        return (
+            ("x", geometry.x),
+            ("y", geometry.y),
+            ("width", geometry.width),
+            ("height", geometry.height),
+        )
+    return tuple(
+        (f"points[{index}].{axis}", value)
+        for index, point in enumerate(geometry.points)
+        for axis, value in zip(("x", "y"), point)
+    )
+
+
+def _is_coordinate_name(name: str) -> bool:
+    return name in {"x", "y"} or name.endswith((".x", ".y"))
+
+
+def _geometry_area(geometry: OutputGeometry) -> float:
+    if isinstance(geometry, BoundingBox):
+        return abs(geometry.width * geometry.height)
+    signed_double_area = sum(
+        first[0] * second[1] - second[0] * first[1]
+        for first, second in zip(geometry.points, geometry.points[1:])
+    )
+    return abs(signed_double_area) / 2
 
 
 @dataclass

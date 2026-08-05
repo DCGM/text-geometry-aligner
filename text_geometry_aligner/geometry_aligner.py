@@ -11,6 +11,7 @@ from typing import Any
 import text_geometry_aligner.base_aligner as base_aligner_module
 from text_geometry_aligner.io_alto import ALTOPage, ALTOReader
 from text_geometry_aligner.base_aligner import (
+    AlignmentPageWriter,
     BaseAligner,
     add_common_cli_arguments,
     validate_common_cli_arguments,
@@ -31,6 +32,7 @@ from text_geometry_aligner.io_json import (
     AlignmentJSONWriter,
     JSONGeometryReader,
 )
+from text_geometry_aligner.io_label_studio import LabelStudioWriter
 from text_geometry_aligner.models import (
     AlignmentDocument,
     AlignmentMode,
@@ -40,15 +42,13 @@ from text_geometry_aligner.models import (
     OutputGeometryFormat,
     OutputGeometrySource,
     OutputTextSource,
+    _format_json_path,
 )
 from text_geometry_aligner.rendering import AlignmentRenderer
 from text_geometry_aligner.text_building import (
     TextBuilder,
 )
-from text_geometry_aligner.utils import (
-    _format_json_path,
-    _parse_logging_level,
-)
+from text_geometry_aligner.utils import _parse_logging_level
 from text_geometry_aligner.io_yolo import YOLOReader
 
 logger = logging.getLogger(__name__)
@@ -83,7 +83,7 @@ class GeometryAligner(BaseAligner):
         geometry_builder: GeometryBuilder | None = None,
         alto_reader: ALTOReader | None = None,
         json_reader: JSONGeometryReader | None = None,
-        json_writer: AlignmentJSONWriter | None = None,
+        json_writer: AlignmentPageWriter | None = None,
         renderer: AlignmentRenderer | None = None,
         yolo_reader: YOLOReader | None = None,
     ):
@@ -330,6 +330,16 @@ def main() -> None:
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
     try:
+        json_writer = (
+            LabelStudioWriter(
+                alignment_mode=AlignmentMode.GEOMETRY,
+                image_prefix=args.label_studio_image_prefix,
+                output_text_source=OutputTextSource.ALTO,
+                output_geometry_source=args.output_geometry_source,
+            )
+            if args.output_json_format == "label-studio"
+            else None
+        )
         aligner = GeometryAligner(
             geometry_suffix=args.geometry_suffix,
             minimum_overlap_coverage=args.minimum_overlap_coverage,
@@ -344,6 +354,7 @@ def main() -> None:
             geometry_builder=base_aligner_module._build_geometry_builder(
                 OutputGeometryFormat(args.output_alto_geometry_format)
             ),
+            json_writer=json_writer,
         )
     except ValueError as exc:
         parser.error(str(exc))

@@ -22,8 +22,8 @@ from ..models import (
     OutputGeometrySource,
     OutputTextSource,
     Polygon,
+    _format_json_path,
 )
-from ..utils import _format_json_path
 
 
 class AlignmentJSONWriter:
@@ -53,7 +53,10 @@ class AlignmentJSONWriter:
         )
 
     def to_data(self, page: AlignmentPage) -> dict[str, Any]:
-        if page.input_format is InputFormat.YOLO:
+        if page.input_format in {
+            InputFormat.LABEL_STUDIO,
+            InputFormat.YOLO,
+        }:
             return self._to_grouped_data(page)
         return self._to_original_data(page)
 
@@ -170,7 +173,7 @@ class AlignmentJSONWriter:
             }
             if conflicting_keys:
                 raise ValueError(
-                    "YOLO class names collide with generated JSON keys: "
+                    "Input labels collide with generated JSON keys: "
                     f"{sorted(conflicting_keys)}"
                 )
             output[label] = [region.alto_text for region in regions]

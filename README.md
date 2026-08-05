@@ -34,7 +34,7 @@ separate from ALTO-derived fields:
 - `AlignmentRegion` holds `input_text`, `input_text_normalized`,
   `input_geometry`, the selected text-alignment candidate, `alto_text`,
   `alto_text_normalized`, `alto_geometry`, assigned `words`, JSON paths, and
-  optional YOLO category metadata.
+  optional source-specific category metadata.
 - `AlignmentWord` records the selected ALTO word, its normalized comparison
   text, bbox, ALTO indexes, element ID, directional coverage values, and the
   overlap score used for matching.
@@ -42,8 +42,16 @@ separate from ALTO-derived fields:
 Fields produced by matching are `None` before matching and remain `None` when
 no match is found. JSON pages additionally retain a private working copy in
 `json_source_data` so their original arbitrary nesting can be reconstructed
-without reading the file again. YOLO pages set `json_source_data` to `None`
-because their output JSON is constructed from the regions.
+without reading the file again. YOLO and Label Studio pages set
+`json_source_data` to `None` because their output JSON is constructed from the
+regions.
+
+When an `AlignmentRegion` receives suspicious input geometry, it emits one
+warning containing its region ID, label, category ID, JSON paths, geometry,
+and all detected issues. Coordinates below zero, dimensions below 5 units,
+areas below 100 square units, and non-finite values are considered suspicious.
+Readers log the page key and source file (or in-memory source) before creating
+regions, so each warning can be traced back to its input page.
 
 ## Installation
 
@@ -276,6 +284,33 @@ Repeated detections remain parallel lists:
 }
 ```
 
+### Label Studio geometry input
+
+`LabelStudioReader` reads one Label Studio JSON project export into an
+`AlignmentDocument`, mapping each task to a page and each `rectanglelabels`
+result from the newest non-cancelled annotation to a region. The page key is
+derived from the task's `data.image` filename. Rectangle percentages are
+converted to pixels using `original_width` and `original_height`.
+
+Only axis-aligned rectangles are supported; non-zero rectangle or image
+rotation is rejected. Predictions, drafts, result text metadata, and result
+types other than `rectanglelabels` are ignored. Category IDs and confidences
+remain unset when they are not present in the source result. Source JSON paths
+are retained on regions for diagnostics, but the original project JSON is not
+copied into the page.
+
+`AlignmentJSONWriter` can construct the package's parallel label and
+`*_bbox` lists from Label Studio input regions. `LabelStudioWriter` instead
+creates importable Label Studio predictions from pages produced by either
+alignment pipeline. It converts every geometry, including polygons, to its
+axis-aligned bounds and then to image percentages.
+
+Each prediction result stores the selected text in `meta.text`. Available
+`input_geometry_confidence` and `alignment_score` values are retained as named
+metadata. The recognized result `score` is their minimum, or the only value
+when just one is available. The prediction-wide score is the minimum result
+score on the page.
+
 ## Geometry representations
 
 A bbox is an object in ALTO coordinates:
@@ -332,6 +367,18 @@ order. `all-over-threshold` retains the word for every eligible region.
 Both commands process top-level files in the supplied directories and write
 one JSON result per matched page. Output directories are created
 automatically.
+
+Package JSON is written by default. Either command can instead emit Label
+Studio predictions:
+
+```bash
+--output-json-format label-studio \
+--label-studio-image-prefix "/data/local-files/?d=digilinka_knihy/images/"
+```
+
+The image reference is the configured prefix followed by the page key and
+`.jpg`. Label Studio output requires the prefix and uses the same
+`--json-output-dir` destination.
 
 ### Text alignment
 
@@ -586,25 +633,33 @@ skipping them.
 
 ### Format adapters in memory
 
-Format readers create `AlignmentPage` objects from either files or in-memory
-data. JSON has separate readers because text and geometry inputs require
-different extraction rules:
+Format readers create the shared model from either files or in-memory data.
+JSON has separate readers because text and geometry inputs require different
+extraction rules:
 
 ```python
 from text_geometry_aligner import (
     JSONGeometryReader,
     JSONTextReader,
+    LabelStudioReader,
+    LabelStudioWriter,
     YOLOReader,
 )
 
 text_page = JSONTextReader().from_data({"title": "Rome"})
 geometry_page = JSONGeometryReader().read("input/page.json")
 yolo_page = YOLOReader().from_data(detections, page_key="page")
+label_studio_document = LabelStudioReader().read("project-export.json")
+label_studio_writer = LabelStudioWriter(
+    alignment_mode="geometry",
+    image_prefix="/data/local-files/?d=books/images/",
+)
 ```
 
 `AlignmentJSONWriter.to_data(page)` returns an in-memory dictionary, while
 `AlignmentJSONWriter.write(page, path)` atomically writes the same result to
-disk. The aligners expose their configured writer as `json_writer`.
+disk. `LabelStudioWriter` supports the same two methods. The aligners expose
+their configured writer as `json_writer`.
 
 ## Package structure and extension points
 
@@ -612,6 +667,7 @@ disk. The aligners expose their configured writer as `json_writer`.
 | --- | --- |
 | `io_alto` | Read ALTO into the internal word-level representation |
 | `io_json` | Read JSON into alignment pages and convert/write enriched pages |
+| `io_label_studio` | Read Label Studio rectangles and write Label Studio predictions |
 | `io_yolo` | Read absolute YOLO detections into geometry alignment pages |
 | `text_matching` | Normalized ALTO text indexing, candidate generation, and candidate selection |
 | `geometry_matching` | `GeometryOverlapCalculator` and `GeometryWordAssigner` implementations |

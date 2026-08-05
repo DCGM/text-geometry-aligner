@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import json
+import logging
 import math
 import os
 from numbers import Real
@@ -18,8 +19,10 @@ from ..models import (
     JSONPath,
     Point,
     Polygon,
+    _format_json_path,
 )
-from ..utils import _format_json_path
+
+logger = logging.getLogger(__name__)
 
 
 class JSONGeometryReader:
@@ -127,6 +130,11 @@ class JSONGeometryReader:
     ) -> AlignmentPage:
         """Convert in-memory JSON geometry data into an alignment page."""
 
+        logger.info(
+            "Loading JSON geometry page %r from %s",
+            page_key,
+            input_file_path or "in-memory data",
+        )
         return AlignmentPage(
             page_key=page_key,
             input_format=InputFormat.JSON,

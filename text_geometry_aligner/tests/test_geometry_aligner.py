@@ -3,6 +3,7 @@
 import contextlib
 import importlib.util
 import io
+import logging
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -57,6 +58,39 @@ def _output(aligner, document):
 
 
 class JSONGeometryReaderTests(unittest.TestCase):
+    def test_reader_logs_source_before_suspicious_region_warning(self) -> None:
+        with self.assertLogs(
+            "text_geometry_aligner",
+            logging.INFO,
+        ) as captured:
+            alignment.JSONGeometryReader().from_data(
+                {
+                    "groups": [
+                        {
+                            "title_bbox": _bbox(
+                                -1,
+                                width=2,
+                                height=3,
+                            )
+                        }
+                    ]
+                },
+                page_key="page-7",
+                input_file_path=Path("input/page-7.json"),
+            )
+
+        self.assertEqual(len(captured.records), 2)
+        self.assertEqual(captured.records[0].levelno, logging.INFO)
+        self.assertIn(
+            "Loading JSON geometry page 'page-7' from input/page-7.json",
+            captured.records[0].getMessage(),
+        )
+        self.assertEqual(captured.records[1].levelno, logging.WARNING)
+        self.assertIn(
+            "json_geometry_path='$.groups[0].title_bbox'",
+            captured.records[1].getMessage(),
+        )
+
     def test_extracts_nested_bbox_lists_and_retains_parallel_paths(self) -> None:
         regions = alignment.JSONGeometryReader().from_data(
             {

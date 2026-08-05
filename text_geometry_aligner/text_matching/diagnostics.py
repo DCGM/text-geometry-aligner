@@ -6,8 +6,7 @@ import logging
 from collections import defaultdict
 from typing import Sequence
 
-from ..models import AlignmentRegion
-from ..utils import _format_json_path
+from ..models import AlignmentRegion, _format_json_path
 from .candidate import AlignmentCandidate
 
 logger = logging.getLogger(__name__)

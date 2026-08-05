@@ -9,8 +9,13 @@ import os
 from pathlib import Path
 from typing import Any, Sequence
 
-from ..models import AlignmentPage, AlignmentRegion, InputFormat, JSONPath
-from ..utils import _format_json_path
+from ..models import (
+    AlignmentPage,
+    AlignmentRegion,
+    InputFormat,
+    JSONPath,
+    _format_json_path,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -155,6 +160,11 @@ class JSONTextReader:
     ) -> AlignmentPage:
         """Convert in-memory JSON text data into an alignment page."""
 
+        logger.info(
+            "Loading JSON text page %r from %s",
+            page_key,
+            input_file_path or "in-memory data",
+        )
         return AlignmentPage(
             page_key=page_key,
             input_format=InputFormat.JSON,
