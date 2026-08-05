@@ -11,6 +11,7 @@ from numbers import Real
 from pathlib import Path
 from typing import Any
 
+from ..label_mapping import LabelMapper
 from ..models import (
     AlignmentPage,
     AlignmentRegion,
@@ -32,11 +33,13 @@ class JSONGeometryReader:
         self,
         geometry_suffix: str = "_bbox",
         overwrite_existing_text: bool = False,
+        label_mapper: LabelMapper | None = None,
     ):
         if not geometry_suffix:
             raise ValueError("geometry_suffix must not be empty")
         self.geometry_suffix = geometry_suffix
         self.overwrite_existing_text = overwrite_existing_text
+        self.label_mapper = label_mapper
 
     def _extract_regions(
         self,
@@ -91,6 +94,7 @@ class JSONGeometryReader:
                     AlignmentRegion(
                         region_id=len(regions),
                         label=_path_label(text_path),
+                        label_mapper=self.label_mapper,
                         input_text=(
                             destination
                             if isinstance(destination, (str, int, float))

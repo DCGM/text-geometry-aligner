@@ -3,9 +3,11 @@ from __future__ import annotations
 import json
 import logging
 import math
-from dataclasses import dataclass, field
+from dataclasses import InitVar, dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Optional
+
+from .label_mapping import LabelMapper
 
 if TYPE_CHECKING:
     from .text_matching.candidate import AlignmentCandidate
@@ -167,6 +169,8 @@ class AlignmentRegion:
 
     region_id: int
     label: str
+    label_export: str | None = None
+    label_mapper: InitVar[LabelMapper | None] = None
     input_text: ScalarText | None = None
     input_text_normalized: str | None = None
     input_geometry: OutputGeometry | None = None
@@ -181,11 +185,19 @@ class AlignmentRegion:
     json_geometry_path: JSONPath | None = None
     alignment_score: float | None = None
 
-    def __post_init__(self) -> None:
+    def __post_init__(self, label_mapper: LabelMapper | None) -> None:
+        if label_mapper is not None:
+            if self.label_export is not None:
+                raise ValueError(
+                    "label_export and label_mapper must not both be provided"
+                )
+            self.label_export = label_mapper.map(self.label)
         if self.region_id < 0:
             raise ValueError("region_id must not be negative")
         if not self.label:
             raise ValueError("label must not be empty")
+        if self.label_export is not None and not self.label_export.strip():
+            raise ValueError("label_export must not be empty")
         if self.category_id is not None and self.category_id < 0:
             raise ValueError("category_id must not be negative")
         if (
@@ -274,10 +286,12 @@ class AlignmentRegion:
         )
         logger.warning(
             "Suspicious input geometry for region_id=%d label=%r "
+            "label_export=%r "
             "category_id=%r json_geometry_path=%r json_text_path=%r: %r; "
             "reasons: %s",
             self.region_id,
             self.label,
+            self.label_export,
             self.category_id,
             json_geometry_path,
             json_text_path,
@@ -288,6 +302,10 @@ class AlignmentRegion:
     @property
     def matched(self) -> bool:
         return self.words is not None
+
+    @property
+    def label_for_export(self) -> str:
+        return self.label if self.label_export is None else self.label_export
 
 
 def _geometry_coordinate_values(

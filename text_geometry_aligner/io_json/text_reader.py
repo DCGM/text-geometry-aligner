@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 from typing import Any, Sequence
 
+from ..label_mapping import LabelMapper
 from ..models import (
     AlignmentPage,
     AlignmentRegion,
@@ -28,6 +29,7 @@ class JSONTextReader:
         geometry_suffix: str = "_bbox",
         overwrite_existing_geometry: bool = False,
         ignored_geometry_suffixes: Sequence[str] = ("_bbox", "_polygon"),
+        label_mapper: LabelMapper | None = None,
     ):
         if not geometry_suffix:
             raise ValueError("geometry_suffix must not be empty")
@@ -35,6 +37,7 @@ class JSONTextReader:
             raise ValueError("ignored geometry suffixes must not be empty")
         self.geometry_suffix = geometry_suffix
         self.overwrite_existing_geometry = overwrite_existing_geometry
+        self.label_mapper = label_mapper
         self.ignored_geometry_suffixes = frozenset(
             (*ignored_geometry_suffixes, geometry_suffix)
         )
@@ -58,6 +61,7 @@ class JSONTextReader:
                 AlignmentRegion(
                     region_id=len(regions),
                     label=key,
+                    label_mapper=self.label_mapper,
                     input_text=value,
                     json_text_path=path,
                     json_geometry_path=geometry_path,

@@ -25,6 +25,7 @@ from text_geometry_aligner.io_json import (
     JSONTextReader,
 )
 from text_geometry_aligner.io_label_studio import LabelStudioWriter
+from text_geometry_aligner.label_mapping import LabelMapper
 from text_geometry_aligner.models import (
     AlignmentDocument,
     AlignmentMode,
@@ -96,9 +97,15 @@ class TextAligner(BaseAligner):
         renderer: AlignmentRenderer | None = None,
         overwrite_existing_geometry: bool = False,
         output_text_source: OutputTextSource | str = OutputTextSource.JSON,
+        label_mapper: LabelMapper | None = None,
     ):
         if geometry_suffix == "":
             raise ValueError("geometry_suffix must not be empty")
+        if label_mapper is not None and json_reader is not None:
+            raise ValueError(
+                "label_mapper cannot be combined with a custom json_reader; "
+                "configure the reader with the mapper instead"
+            )
         parsed_output_geometry_format = OutputGeometryFormat(
             output_geometry_format
         )
@@ -132,6 +139,7 @@ class TextAligner(BaseAligner):
         self.json_reader = json_reader or JSONTextReader(
             geometry_suffix=self.geometry_suffix,
             overwrite_existing_geometry=overwrite_existing_geometry,
+            label_mapper=label_mapper,
         )
 
     @property
@@ -423,6 +431,11 @@ def main() -> None:
         )
         candidate_generator = _build_candidate_generator(args)
         candidate_selector = _build_candidate_selector(args)
+        label_mapper = (
+            None
+            if args.class_mapping_file is None
+            else LabelMapper.from_file(args.class_mapping_file)
+        )
         json_writer = (
             LabelStudioWriter(
                 alignment_mode=AlignmentMode.TEXT,
@@ -433,7 +446,7 @@ def main() -> None:
             if args.output_json_format == "label-studio"
             else None
         )
-    except ValueError as exc:
+    except (OSError, TypeError, ValueError) as exc:
         parser.error(str(exc))
 
     aligner = TextAligner(
@@ -451,6 +464,7 @@ def main() -> None:
         json_writer=json_writer,
         overwrite_existing_geometry=args.overwrite_existing_geometry,
         output_text_source=args.output_text_source,
+        label_mapper=label_mapper,
     )
     aligner.process_directories(
         alto_input_dir=args.alto_dir,

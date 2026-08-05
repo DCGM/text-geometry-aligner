@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlparse
 
+from ..label_mapping import LabelMapper
 from ..models import (
     AlignmentDocument,
     AlignmentMode,
@@ -29,6 +30,9 @@ logger = logging.getLogger(__name__)
 
 class LabelStudioReader:
     """Read one Label Studio project export containing rectangle labels."""
+
+    def __init__(self, label_mapper: LabelMapper | None = None):
+        self.label_mapper = label_mapper
 
     def read(
         self,
@@ -113,6 +117,7 @@ class LabelStudioReader:
                             result,
                             path,
                             region_id=len(regions),
+                            label_mapper=self.label_mapper,
                         )
                     )
 
@@ -229,6 +234,7 @@ def _region_from_result(
     result_path: JSONPath,
     *,
     region_id: int,
+    label_mapper: LabelMapper | None,
 ) -> AlignmentRegion:
     value_path = result_path + ("value",)
     value = _mapping(result.get("value"), value_path, "rectangle value")
@@ -280,6 +286,7 @@ def _region_from_result(
     return AlignmentRegion(
         region_id=region_id,
         label=labels[0],
+        label_mapper=label_mapper,
         input_geometry=BoundingBox(
             x=x_percent / 100 * original_width,
             y=y_percent / 100 * original_height,

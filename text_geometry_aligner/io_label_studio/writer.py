@@ -136,7 +136,7 @@ class LabelStudioWriter:
             "type": "rectanglelabels",
             "value": {
                 **percentage_bbox.to_json(),
-                "rectanglelabels": [region.label],
+                "rectanglelabels": [region.label_for_export],
             },
             "meta": metadata,
         }

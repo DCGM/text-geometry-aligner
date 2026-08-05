@@ -433,6 +433,11 @@ def add_common_cli_arguments(
         help="Image reference prefix for Label Studio output",
     )
     parser.add_argument(
+        "--class-mapping-file",
+        default=None,
+        help="Optional UTF-8 JSON source-to-export class mapping",
+    )
+    parser.add_argument(
         "--output-alto-text-format",
         choices=ALTO_TEXT_FORMAT_CHOICES,
         default="space-separated",

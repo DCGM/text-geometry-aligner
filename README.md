@@ -34,7 +34,8 @@ separate from ALTO-derived fields:
 - `AlignmentRegion` holds `input_text`, `input_text_normalized`,
   `input_geometry`, the selected text-alignment candidate, `alto_text`,
   `alto_text_normalized`, `alto_geometry`, assigned `words`, JSON paths, and
-  optional source-specific category metadata.
+  optional source-specific category metadata. Its `label` always retains the
+  source name; optional `label_export` supplies a different exported name.
 - `AlignmentWord` records the selected ALTO word, its normalized comparison
   text, bbox, ALTO indexes, element ID, directional coverage values, and the
   overlap score used for matching.
@@ -47,11 +48,12 @@ without reading the file again. YOLO and Label Studio pages set
 regions.
 
 When an `AlignmentRegion` receives suspicious input geometry, it emits one
-warning containing its region ID, label, category ID, JSON paths, geometry,
-and all detected issues. Coordinates below zero, dimensions below 5 units,
-areas below 100 square units, and non-finite values are considered suspicious.
-Readers log the page key and source file (or in-memory source) before creating
-regions, so each warning can be traced back to its input page.
+warning containing its region ID, source and export labels, category ID, JSON
+paths, geometry, and all detected issues. Coordinates below zero, dimensions
+below 5 units, areas below 100 square units, and non-finite values are
+considered suspicious. Readers log the page key and source file (or in-memory
+source) before creating regions, so each warning can be traced back to its
+input page.
 
 ## Installation
 
@@ -284,6 +286,9 @@ Repeated detections remain parallel lists:
 }
 ```
 
+When class mapping is configured, grouped output uses the export class name.
+Multiple source classes may therefore be combined into one pair of lists.
+
 ### Label Studio geometry input
 
 `LabelStudioReader` reads one Label Studio JSON project export into an
@@ -379,6 +384,23 @@ Studio predictions:
 The image reference is the configured prefix followed by the page key and
 `.jpg`. Label Studio output requires the prefix and uses the same
 `--json-output-dir` destination.
+
+Either pipeline can remap class names during export with an exact,
+case-sensitive UTF-8 JSON object:
+
+```json
+{
+  "Title": "heading",
+  "Subtitle": "heading",
+  "Page Number": "page_number"
+}
+```
+
+Pass it as `--class-mapping-file class-mapping.json`. The original name stays
+in `AlignmentRegion.label` for input diagnostics and source-structured JSON;
+the mapped name is stored in `label_export` and used by grouped package JSON
+and Label Studio predictions. Unmapped labels retain their original export
+name. Mapping is one exact lookup, so mapped values are not mapped again.
 
 ### Text alignment
 
@@ -641,12 +663,16 @@ extraction rules:
 from text_geometry_aligner import (
     JSONGeometryReader,
     JSONTextReader,
+    LabelMapper,
     LabelStudioReader,
     LabelStudioWriter,
     YOLOReader,
 )
 
-text_page = JSONTextReader().from_data({"title": "Rome"})
+label_mapper = LabelMapper.from_file("class-mapping.json")
+text_page = JSONTextReader(label_mapper=label_mapper).from_data(
+    {"title": "Rome"}
+)
 geometry_page = JSONGeometryReader().read("input/page.json")
 yolo_page = YOLOReader().from_data(detections, page_key="page")
 label_studio_document = LabelStudioReader().read("project-export.json")

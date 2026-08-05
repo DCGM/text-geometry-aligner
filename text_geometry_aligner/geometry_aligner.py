@@ -33,6 +33,8 @@ from text_geometry_aligner.io_json import (
     JSONGeometryReader,
 )
 from text_geometry_aligner.io_label_studio import LabelStudioWriter
+from text_geometry_aligner.io_yolo import YOLOReader
+from text_geometry_aligner.label_mapping import LabelMapper
 from text_geometry_aligner.models import (
     AlignmentDocument,
     AlignmentMode,
@@ -49,7 +51,6 @@ from text_geometry_aligner.text_building import (
     TextBuilder,
 )
 from text_geometry_aligner.utils import _parse_logging_level
-from text_geometry_aligner.io_yolo import YOLOReader
 
 logger = logging.getLogger(__name__)
 
@@ -86,9 +87,17 @@ class GeometryAligner(BaseAligner):
         json_writer: AlignmentPageWriter | None = None,
         renderer: AlignmentRenderer | None = None,
         yolo_reader: YOLOReader | None = None,
+        label_mapper: LabelMapper | None = None,
     ):
         if not geometry_suffix:
             raise ValueError("geometry_suffix must not be empty")
+        if label_mapper is not None and (
+            json_reader is not None or yolo_reader is not None
+        ):
+            raise ValueError(
+                "label_mapper cannot be combined with custom input readers; "
+                "configure the readers with the mapper instead"
+            )
         if not 0.0 <= minimum_overlap_coverage <= 1.0:
             raise ValueError(
                 "minimum_overlap_coverage must be within [0, 1]"
@@ -125,8 +134,11 @@ class GeometryAligner(BaseAligner):
         self.json_reader = json_reader or JSONGeometryReader(
             geometry_suffix=geometry_suffix,
             overwrite_existing_text=overwrite_existing_text,
+            label_mapper=label_mapper,
         )
-        self.yolo_reader = yolo_reader or YOLOReader()
+        self.yolo_reader = yolo_reader or YOLOReader(
+            label_mapper=label_mapper
+        )
 
     @property
     def render_text_source(self) -> OutputTextSource:
@@ -330,6 +342,11 @@ def main() -> None:
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
     try:
+        label_mapper = (
+            None
+            if args.class_mapping_file is None
+            else LabelMapper.from_file(args.class_mapping_file)
+        )
         json_writer = (
             LabelStudioWriter(
                 alignment_mode=AlignmentMode.GEOMETRY,
@@ -355,8 +372,9 @@ def main() -> None:
                 OutputGeometryFormat(args.output_alto_geometry_format)
             ),
             json_writer=json_writer,
+            label_mapper=label_mapper,
         )
-    except ValueError as exc:
+    except (OSError, TypeError, ValueError) as exc:
         parser.error(str(exc))
 
     aligner.process_directories(

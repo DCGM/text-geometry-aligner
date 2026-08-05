@@ -161,7 +161,7 @@ class AlignmentJSONWriter:
     def _to_grouped_data(self, page: AlignmentPage) -> dict[str, Any]:
         grouped: OrderedDict[str, list[AlignmentRegion]] = OrderedDict()
         for region in page.regions:
-            grouped.setdefault(region.label, []).append(region)
+            grouped.setdefault(region.label_for_export, []).append(region)
 
         output: dict[str, Any] = {}
         for label, regions in grouped.items():

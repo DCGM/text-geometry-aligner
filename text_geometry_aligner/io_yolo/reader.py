@@ -9,6 +9,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+from ..label_mapping import LabelMapper
 from ..models import (
     AlignmentPage,
     AlignmentRegion,
@@ -34,6 +35,9 @@ class YOLODetection:
 
 class YOLOReader:
     """Read absolute-coordinate YOLO detections into alignment pages."""
+
+    def __init__(self, label_mapper: LabelMapper | None = None):
+        self.label_mapper = label_mapper
 
     def read(
         self,
@@ -71,6 +75,7 @@ class YOLOReader:
                 AlignmentRegion(
                     region_id=region_id,
                     label=detection.class_name,
+                    label_mapper=self.label_mapper,
                     input_geometry=BoundingBox(
                         x=detection.center_x - detection.width / 2,
                         y=detection.center_y - detection.height / 2,
