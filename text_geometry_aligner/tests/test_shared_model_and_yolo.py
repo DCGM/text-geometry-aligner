@@ -124,7 +124,7 @@ class SharedAlignmentModelTests(unittest.TestCase):
                 ]
             },
         )
-        output = aligner.export_page(document.pages[0])
+        output = aligner.json_writer.to_data(document.pages[0])
 
         self.assertEqual(
             output["groups_bbox"],
@@ -143,14 +143,38 @@ class SharedAlignmentModelTests(unittest.TestCase):
 
 
 class YOLOAdapterTests(unittest.TestCase):
-    def test_reader_and_extractor_preserve_detection_metadata(self) -> None:
+    def test_reader_accepts_in_memory_detections(self) -> None:
+        page = alignment.YOLOReader().from_data(
+            [
+                alignment.YOLODetection(
+                    category_id=3,
+                    center_x=25,
+                    center_y=30,
+                    width=30,
+                    height=10,
+                    confidence=0.875,
+                    class_name="Page Number",
+                )
+            ],
+            page_key="memory-page",
+        )
+
+        self.assertEqual(page.page_key, "memory-page")
+        self.assertIsNone(page.input_file_path)
+        self.assertEqual(page.regions[0].label, "Page Number")
+        self.assertEqual(
+            page.regions[0].input_geometry,
+            alignment.BoundingBox(10, 25, 30, 10),
+        )
+
+    def test_reader_preserves_detection_metadata(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
             path = Path(temporary_directory) / "page.detections"
             path.write_text(
                 "3 25 30 30 10 0.875 Page Number\n",
                 encoding="utf-8",
             )
-            page = alignment.YOLOGeometryExtractor().extract_alignment_page(
+            page = alignment.YOLOReader().read(
                 path,
                 page_key="page",
             )
@@ -205,12 +229,12 @@ class YOLOAdapterTests(unittest.TestCase):
                 ),
             ],
         )
-        output = alignment.AlignmentJSONExporter(
+        output = alignment.AlignmentJSONWriter(
             alignment_mode=alignment.AlignmentMode.GEOMETRY,
             geometry_suffix="_bbox",
             output_geometry_format=alignment.OutputGeometryFormat.BBOX,
             output_geometry_source=alignment.OutputGeometrySource.INPUT,
-        ).export(page)
+        ).to_data(page)
 
         self.assertEqual(output["PageNumber"], ["12", None])
         self.assertEqual(
@@ -241,14 +265,14 @@ class YOLOAdapterTests(unittest.TestCase):
                 ),
             ],
         )
-        exporter = alignment.AlignmentJSONExporter(
+        writer = alignment.AlignmentJSONWriter(
             alignment_mode=alignment.AlignmentMode.GEOMETRY,
             geometry_suffix="_bbox",
             output_geometry_format=alignment.OutputGeometryFormat.BBOX,
         )
 
         with self.assertRaisesRegex(ValueError, "collide"):
-            exporter.export(page)
+            writer.to_data(page)
 
     def test_process_files_pairs_by_key_and_preserves_input_order(
         self,
@@ -274,7 +298,7 @@ class YOLOAdapterTests(unittest.TestCase):
             first_alto.write_text(_alto_xml("1"), encoding="utf-8")
             second_alto.write_text(_alto_xml("2"), encoding="utf-8")
             json_writer = mock.create_autospec(
-                alignment.JSONWriter,
+                alignment.AlignmentJSONWriter,
                 instance=True,
             )
 
@@ -447,7 +471,7 @@ class YOLOAdapterTests(unittest.TestCase):
                 encoding="utf-8",
             )
             json_writer = mock.create_autospec(
-                alignment.JSONWriter,
+                alignment.AlignmentJSONWriter,
                 instance=True,
             )
 

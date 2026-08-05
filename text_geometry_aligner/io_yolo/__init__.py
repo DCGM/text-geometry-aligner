@@ -1,4 +1,4 @@
-"""YOLO label input."""
+"""YOLO label I/O adapters."""
 
 from .reader import YOLODetection, YOLOReader
 

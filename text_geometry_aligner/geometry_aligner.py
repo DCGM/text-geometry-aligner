@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 import text_geometry_aligner.base_aligner as base_aligner_module
-from text_geometry_aligner.alto_io import ALTOPage, ALTOReader
+from text_geometry_aligner.io_alto import ALTOPage, ALTOReader
 from text_geometry_aligner.base_aligner import (
     BaseAligner,
     add_common_cli_arguments,
@@ -27,10 +27,9 @@ from text_geometry_aligner.geometry_matching import (
     create_overlap_calculator,
     create_word_assigner,
 )
-from text_geometry_aligner.json_io import JSONReader, JSONWriter
-from text_geometry_aligner.json_processing import (
-    AlignmentJSONExporter,
-    JSONGeometryExtractor,
+from text_geometry_aligner.io_json import (
+    AlignmentJSONWriter,
+    JSONGeometryReader,
 )
 from text_geometry_aligner.models import (
     AlignmentDocument,
@@ -50,7 +49,7 @@ from text_geometry_aligner.utils import (
     _format_json_path,
     _parse_logging_level,
 )
-from text_geometry_aligner.yolo_processing import YOLOGeometryExtractor
+from text_geometry_aligner.io_yolo import YOLOReader
 
 logger = logging.getLogger(__name__)
 
@@ -83,10 +82,10 @@ class GeometryAligner(BaseAligner):
         text_builder: TextBuilder | None = None,
         geometry_builder: GeometryBuilder | None = None,
         alto_reader: ALTOReader | None = None,
-        json_reader: JSONReader | None = None,
-        json_writer: JSONWriter | None = None,
+        json_reader: JSONGeometryReader | None = None,
+        json_writer: AlignmentJSONWriter | None = None,
         renderer: AlignmentRenderer | None = None,
-        yolo_extractor: YOLOGeometryExtractor | None = None,
+        yolo_reader: YOLOReader | None = None,
     ):
         if not geometry_suffix:
             raise ValueError("geometry_suffix must not be empty")
@@ -94,15 +93,21 @@ class GeometryAligner(BaseAligner):
             raise ValueError(
                 "minimum_overlap_coverage must be within [0, 1]"
             )
+        resolved_json_writer = json_writer or AlignmentJSONWriter(
+            alignment_mode=self.alignment_mode,
+            geometry_suffix=geometry_suffix,
+            output_geometry_format=output_geometry_format,
+            output_text_source=OutputTextSource.ALTO,
+            output_geometry_source=output_geometry_source,
+        )
         super().__init__(
             alto_reader=alto_reader,
-            json_writer=json_writer,
+            json_writer=resolved_json_writer,
             output_geometry_format=output_geometry_format,
             geometry_builder=geometry_builder,
             text_builder=text_builder,
             renderer=renderer,
         )
-        self.json_reader = json_reader or JSONReader()
         self.geometry_suffix = geometry_suffix
         self.minimum_overlap_coverage = minimum_overlap_coverage
         self.overlap_strategy = GeometryOverlapStrategy(overlap_strategy)
@@ -117,18 +122,11 @@ class GeometryAligner(BaseAligner):
         self.word_assigner = word_assigner or create_word_assigner(
             self.word_assignment_strategy
         )
-        self.json_extractor = JSONGeometryExtractor(
+        self.json_reader = json_reader or JSONGeometryReader(
             geometry_suffix=geometry_suffix,
             overwrite_existing_text=overwrite_existing_text,
         )
-        self.yolo_extractor = yolo_extractor or YOLOGeometryExtractor()
-        self.json_exporter = AlignmentJSONExporter(
-            alignment_mode=self.alignment_mode,
-            geometry_suffix=geometry_suffix,
-            output_geometry_format=self.output_geometry_format,
-            output_text_source=OutputTextSource.ALTO,
-            output_geometry_source=self.output_geometry_source,
-        )
+        self.yolo_reader = yolo_reader or YOLOReader()
 
     @property
     def render_text_source(self) -> OutputTextSource:
@@ -145,14 +143,13 @@ class GeometryAligner(BaseAligner):
         page_key: str,
     ) -> AlignmentPage:
         if input_format is InputFormat.YOLO:
-            return self.yolo_extractor.extract_alignment_page(
+            return self.yolo_reader.read(
                 input_file,
                 page_key=page_key,
             )
-        return self.json_extractor.extract_alignment_page(
-            self.json_reader.read(input_file),
+        return self.json_reader.read(
+            input_file,
             page_key=page_key,
-            input_file_path=input_file,
         )
 
     def align_data(
@@ -162,7 +159,7 @@ class GeometryAligner(BaseAligner):
     ) -> AlignmentDocument:
         """Align loaded geometry JSON and return a one-page document."""
 
-        page = self.json_extractor.extract_alignment_page(
+        page = self.json_reader.from_data(
             input_data,
             page_key="page",
         )
@@ -269,9 +266,6 @@ class GeometryAligner(BaseAligner):
             page.unmatched_count,
         )
         return page
-
-    def export_page(self, page: AlignmentPage) -> dict[str, object]:
-        return self.json_exporter.export(page)
 
 def build_argument_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(

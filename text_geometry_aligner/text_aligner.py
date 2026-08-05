@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 import text_geometry_aligner.base_aligner as base_aligner_module
-from text_geometry_aligner.alto_io import ALTOPage, ALTOReader
+from text_geometry_aligner.io_alto import ALTOPage, ALTOReader
 from text_geometry_aligner.base_aligner import (
     BaseAligner,
     add_common_cli_arguments,
@@ -19,10 +19,9 @@ from text_geometry_aligner.geometry_building import (
     GeometryBuilder,
     validate_geometry_format,
 )
-from text_geometry_aligner.json_io import JSONReader, JSONWriter
-from text_geometry_aligner.json_processing import (
-    AlignmentJSONExporter,
-    JSONTextExtractor,
+from text_geometry_aligner.io_json import (
+    AlignmentJSONWriter,
+    JSONTextReader,
 )
 from text_geometry_aligner.models import (
     AlignmentDocument,
@@ -90,8 +89,8 @@ class TextAligner(BaseAligner):
         ),
         normalizer: TextNormalizer | None = None,
         alto_reader: ALTOReader | None = None,
-        json_reader: JSONReader | None = None,
-        json_writer: JSONWriter | None = None,
+        json_reader: JSONTextReader | None = None,
+        json_writer: AlignmentJSONWriter | None = None,
         geometry_builder: GeometryBuilder | None = None,
         text_builder: TextBuilder | None = None,
         renderer: AlignmentRenderer | None = None,
@@ -100,18 +99,28 @@ class TextAligner(BaseAligner):
     ):
         if geometry_suffix == "":
             raise ValueError("geometry_suffix must not be empty")
+        parsed_output_geometry_format = OutputGeometryFormat(
+            output_geometry_format
+        )
+        resolved_geometry_suffix = geometry_suffix or (
+            f"_{parsed_output_geometry_format.value}"
+        )
+        resolved_json_writer = json_writer or AlignmentJSONWriter(
+            alignment_mode=self.alignment_mode,
+            geometry_suffix=resolved_geometry_suffix,
+            output_geometry_format=parsed_output_geometry_format,
+            output_text_source=output_text_source,
+            output_geometry_source=OutputGeometrySource.ALTO,
+        )
         super().__init__(
             alto_reader=alto_reader,
-            json_writer=json_writer,
+            json_writer=resolved_json_writer,
             output_geometry_format=output_geometry_format,
             geometry_builder=geometry_builder,
             text_builder=text_builder,
             renderer=renderer,
         )
-        self.json_reader = json_reader or JSONReader()
-        self.geometry_suffix = geometry_suffix or (
-            f"_{self.output_geometry_format.value}"
-        )
+        self.geometry_suffix = resolved_geometry_suffix
         self.output_text_source = OutputTextSource(output_text_source)
         self.overwrite_existing_geometry = overwrite_existing_geometry
         self.normalizer = (
@@ -120,16 +129,9 @@ class TextAligner(BaseAligner):
         )
         self.candidate_generator = candidate_generator
         self.candidate_selector = candidate_selector
-        self.extractor = JSONTextExtractor(
+        self.json_reader = json_reader or JSONTextReader(
             geometry_suffix=self.geometry_suffix,
             overwrite_existing_geometry=overwrite_existing_geometry,
-        )
-        self.json_exporter = AlignmentJSONExporter(
-            alignment_mode=self.alignment_mode,
-            geometry_suffix=self.geometry_suffix,
-            output_geometry_format=self.output_geometry_format,
-            output_text_source=self.output_text_source,
-            output_geometry_source=OutputGeometrySource.ALTO,
         )
 
     @property
@@ -144,10 +146,9 @@ class TextAligner(BaseAligner):
     ) -> AlignmentPage:
         if input_format is not InputFormat.JSON:
             raise ValueError("Text alignment supports JSON input only")
-        return self.extractor.extract_alignment_page(
-            self.json_reader.read(input_file),
+        return self.json_reader.read(
+            input_file,
             page_key=page_key,
-            input_file_path=input_file,
         )
 
     def align_data(
@@ -157,7 +158,7 @@ class TextAligner(BaseAligner):
     ) -> AlignmentDocument:
         """Align loaded JSON and return a one-page document."""
 
-        page = self.extractor.extract_alignment_page(
+        page = self.json_reader.from_data(
             input_data,
             page_key="page",
         )
@@ -277,9 +278,6 @@ class TextAligner(BaseAligner):
             len(conflicted_region_ids),
         )
         return page
-
-    def export_page(self, page: AlignmentPage) -> dict[str, object]:
-        return self.json_exporter.export(page)
 
 def build_argument_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(

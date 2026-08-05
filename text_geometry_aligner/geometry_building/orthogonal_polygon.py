@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import Sequence
 
-from ..alto_io import ALTOWord
+from ..io_alto import ALTOWord
 from ..models import BoundingBox, Point, Polygon
 from .base import GeometryBuilder
 from .union_bounding_box import UnionBoundingBoxGeometryBuilder

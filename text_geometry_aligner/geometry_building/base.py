@@ -5,7 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Sequence
 
-from ..alto_io import ALTOWord
+from ..io_alto import ALTOWord
 from ..models import (
     BoundingBox,
     OutputGeometry,

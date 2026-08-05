@@ -1,4 +1,4 @@
-"""ALTO file reading and future writing."""
+"""ALTO XML I/O adapters."""
 
 from .reader import ALTOPage, ALTOReader, ALTOWord
 

@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Sequence
 
-from ..alto_io import ALTOWord
+from ..io_alto import ALTOWord
 from ..models import AlignmentRegion
 from .overlap import GeometryWordOverlap
 

@@ -3,6 +3,7 @@
 import contextlib
 import importlib.util
 import io
+import json
 import logging
 import tempfile
 import unittest
@@ -157,7 +158,7 @@ def _combined_generator(
 
 
 def _output(aligner, document):
-    return aligner.export_page(document.pages[0])
+    return aligner.json_writer.to_data(document.pages[0])
 
 
 class _FirstCandidateSelector:
@@ -181,22 +182,48 @@ class _StaticCandidateGenerator(alignment.CandidateGenerator):
 
 
 class FormatIOTests(unittest.TestCase):
-    def test_json_reader_and_writer_round_trip_utf8_atomically(self) -> None:
+    def test_alignment_json_writer_writes_utf8_atomically(self) -> None:
         data = {"title": "Řím", "publishers": ["Šolc"]}
+        page = alignment.AlignmentPage(
+            page_key="page",
+            input_format=alignment.InputFormat.JSON,
+            regions=[],
+            json_source_data=data,
+        )
+        writer = alignment.AlignmentJSONWriter(
+            alignment_mode=alignment.AlignmentMode.TEXT,
+            geometry_suffix="_bbox",
+            output_geometry_format=alignment.OutputGeometryFormat.BBOX,
+        )
 
         with tempfile.TemporaryDirectory() as temporary_directory:
             output_path = (
                 Path(temporary_directory) / "nested" / "document.json"
             )
-            alignment.JSONWriter().write(data, output_path)
+            writer.write(page, output_path)
 
-            self.assertEqual(alignment.JSONReader().read(output_path), data)
+            self.assertEqual(json.loads(output_path.read_text()), data)
+            self.assertEqual(writer.to_data(page), data)
             output_text = output_path.read_text(encoding="utf-8")
             self.assertIn("Řím", output_text)
             self.assertTrue(output_text.endswith("\n"))
             self.assertFalse(
                 output_path.with_name(f".{output_path.name}.tmp").exists()
             )
+
+    def test_json_text_reader_supports_files_and_in_memory_data(self) -> None:
+        data = {"title": "Rome"}
+        memory_page = alignment.JSONTextReader().from_data(data)
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            input_path = Path(temporary_directory) / "custom.json"
+            input_path.write_text(json.dumps(data), encoding="utf-8")
+            file_page = alignment.JSONTextReader().read(input_path)
+
+        self.assertEqual(file_page.page_key, "custom")
+        self.assertEqual(file_page.input_file_path, input_path)
+        self.assertEqual(file_page.regions, memory_page.regions)
+        self.assertEqual(file_page.json_source_data, data)
 
     def test_alto_reader_only_parses_xml_into_page_model(self) -> None:
         alto_xml = """\
@@ -235,15 +262,19 @@ class FormatIOTests(unittest.TestCase):
             instance=True,
         )
         json_reader = mock.create_autospec(
-            alignment.JSONReader,
+            alignment.JSONTextReader,
             instance=True,
         )
         json_writer = mock.create_autospec(
-            alignment.JSONWriter,
+            alignment.AlignmentJSONWriter,
             instance=True,
         )
         alto_reader.read.return_value = _page("ROME")
-        json_reader.read.return_value = {"title": "Rome"}
+        json_reader.read.return_value = alignment.JSONTextReader().from_data(
+            {"title": "Rome"},
+            page_key="input",
+            input_file_path=Path("input.json"),
+        )
         aligner = alignment.TextAligner(
             alto_reader=alto_reader,
             json_reader=json_reader,
@@ -259,9 +290,12 @@ class FormatIOTests(unittest.TestCase):
         )
 
         alto_reader.read.assert_called_once_with(Path("page.xml"))
-        json_reader.read.assert_called_once_with(Path("input.json"))
+        json_reader.read.assert_called_once_with(
+            Path("input.json"),
+            page_key="input",
+        )
         json_writer.write.assert_called_once_with(
-            _output(aligner, result),
+            result.pages[0],
             Path("output.json"),
         )
 
@@ -271,15 +305,19 @@ class FormatIOTests(unittest.TestCase):
             instance=True,
         )
         json_reader = mock.create_autospec(
-            alignment.JSONReader,
+            alignment.JSONTextReader,
             instance=True,
         )
         json_writer = mock.create_autospec(
-            alignment.JSONWriter,
+            alignment.AlignmentJSONWriter,
             instance=True,
         )
         alto_reader.read.return_value = _page("ROME")
-        json_reader.read.return_value = {"title": "Rome"}
+        json_reader.read.return_value = alignment.JSONTextReader().from_data(
+            {"title": "Rome"},
+            page_key="input",
+            input_file_path=Path("input.json"),
+        )
         aligner = alignment.TextAligner(
             alto_reader=alto_reader,
             json_reader=json_reader,
@@ -843,9 +881,9 @@ class GeometryBuilderTests(unittest.TestCase):
 
 class ListValueTests(unittest.TestCase):
     def test_extractor_exposes_each_scalar_list_element(self) -> None:
-        values = alignment.JSONTextExtractor().extract_alignment_region(
+        values = alignment.JSONTextReader().from_data(
             {"publisher": ["First", "Second"]}
-        )
+        ).regions
 
         self.assertEqual(
             [value.json_text_path for value in values],
@@ -900,7 +938,7 @@ class ListValueTests(unittest.TestCase):
         )
         normalizer = alignment.TextNormalizationPipeline.from_optional_names()
         regions = _normalize_regions(
-            alignment.JSONTextExtractor().extract_alignment_region(
+            alignment.JSONTextReader().from_data(
                 {
                     "partNumber": "I.",
                     "placeTerm": "Praze.",
@@ -908,7 +946,7 @@ class ListValueTests(unittest.TestCase):
                         "ŠOLC a ŠIMÁČEK, společnost s r. o. v Praze."
                     ],
                 }
-            ),
+            ).regions,
             normalizer,
         )
         candidates = alignment.ExactTextCandidateGenerator().generate(
@@ -973,23 +1011,23 @@ class ListValueTests(unittest.TestCase):
         self.assertNotIn("publisher_bbox", output)
 
 
-class AlignmentJSONExporterTests(unittest.TestCase):
+class AlignmentJSONWriterTests(unittest.TestCase):
     def test_reconstructs_nested_output_from_retained_paths(self) -> None:
         input_data = {"groups": [{"names": ["Original"]}]}
-        page = alignment.JSONTextExtractor().extract_alignment_page(
+        page = alignment.JSONTextReader().from_data(
             input_data,
             page_key="page",
         )
         region = page.regions[0]
         region.alto_text = "ALTO"
         region.alto_geometry = alignment.BoundingBox(1, 2, 3, 4)
-        output_data = alignment.AlignmentJSONExporter(
+        output_data = alignment.AlignmentJSONWriter(
             alignment_mode=alignment.AlignmentMode.TEXT,
             geometry_suffix="_bbox",
             output_geometry_format=alignment.OutputGeometryFormat.BBOX,
             output_text_source=alignment.OutputTextSource.ALTO,
             output_geometry_source=alignment.OutputGeometrySource.ALTO,
-        ).export(
+        ).to_data(
             page,
         )
 
@@ -1056,10 +1094,10 @@ class PolygonOutputTests(unittest.TestCase):
         self.assertNotIn("title_polygon", output)
 
     def test_extractor_ignores_geometry_from_both_formats(self) -> None:
-        values = alignment.JSONTextExtractor(
+        values = alignment.JSONTextReader(
             geometry_suffix="_polygon",
             overwrite_existing_geometry=True,
-        ).extract_alignment_region(
+        ).from_data(
             {
                 "title": "Rome",
                 "title_bbox": {
@@ -1070,7 +1108,7 @@ class PolygonOutputTests(unittest.TestCase):
                 },
                 "title_polygon": [[1, 2], [4, 2], [1, 2]],
             }
-        )
+        ).regions
 
         self.assertEqual(
             [value.json_text_path for value in values],
@@ -1753,11 +1791,11 @@ class ArgumentParserTests(unittest.TestCase):
     def test_specific_models_live_with_their_processing_domain(self) -> None:
         self.assertEqual(
             alignment.ALTOWord.__module__,
-            "text_geometry_aligner.alto_io.reader",
+            "text_geometry_aligner.io_alto.reader",
         )
         self.assertEqual(
             alignment.ALTOPage.__module__,
-            "text_geometry_aligner.alto_io.reader",
+            "text_geometry_aligner.io_alto.reader",
         )
         self.assertFalse(hasattr(alignment, "OCRWord"))
         self.assertEqual(
@@ -1770,31 +1808,33 @@ class ArgumentParserTests(unittest.TestCase):
         )
         self.assertFalse(hasattr(alignment, "OCRWordSpan"))
 
-    def test_io_and_processing_apis_have_no_compatibility_aliases(self) -> None:
+    def test_io_apis_have_no_compatibility_aliases(self) -> None:
         self.assertEqual(
             alignment.ALTOReader.__module__,
-            "text_geometry_aligner.alto_io.reader",
+            "text_geometry_aligner.io_alto.reader",
         )
         self.assertEqual(
             alignment.ALTOTextIndex.__module__,
             "text_geometry_aligner.text_matching.alto_text_index",
         )
         self.assertEqual(
-            alignment.JSONReader.__module__,
-            "text_geometry_aligner.json_io.reader",
+            alignment.JSONTextReader.__module__,
+            "text_geometry_aligner.io_json.text_reader",
         )
         self.assertEqual(
-            alignment.JSONWriter.__module__,
-            "text_geometry_aligner.json_io.writer",
+            alignment.JSONGeometryReader.__module__,
+            "text_geometry_aligner.io_json.geometry_reader",
         )
         self.assertEqual(
-            alignment.JSONTextExtractor.__module__,
-            "text_geometry_aligner.json_processing.text_extractor",
+            alignment.AlignmentJSONWriter.__module__,
+            "text_geometry_aligner.io_json.writer",
         )
-        self.assertEqual(
-            alignment.AlignmentJSONExporter.__module__,
-            "text_geometry_aligner.json_processing.alignment_exporter",
-        )
+        self.assertFalse(hasattr(alignment, "JSONReader"))
+        self.assertFalse(hasattr(alignment, "JSONWriter"))
+        self.assertFalse(hasattr(alignment, "JSONTextExtractor"))
+        self.assertFalse(hasattr(alignment, "JSONGeometryExtractor"))
+        self.assertFalse(hasattr(alignment, "AlignmentJSONExporter"))
+        self.assertFalse(hasattr(alignment, "YOLOGeometryExtractor"))
         self.assertFalse(hasattr(alignment, "JSONGeometryMerger"))
         self.assertFalse(hasattr(alignment, "JSONTextMerger"))
         self.assertFalse(hasattr(alignment, "ALTOParser"))
@@ -1814,17 +1854,26 @@ class ArgumentParserTests(unittest.TestCase):
         )
         self.assertIsNone(
             importlib.util.find_spec(
-                "text_geometry_aligner.json_io.extractor"
+                "text_geometry_aligner.io_json.extractor"
+            )
+        )
+        self.assertIsNone(
+            importlib.util.find_spec("text_geometry_aligner.alto_io")
+        )
+        self.assertIsNone(
+            importlib.util.find_spec("text_geometry_aligner.json_io")
+        )
+        self.assertIsNone(
+            importlib.util.find_spec("text_geometry_aligner.yolo_io")
+        )
+        self.assertIsNone(
+            importlib.util.find_spec(
+                "text_geometry_aligner.json_processing"
             )
         )
         self.assertIsNone(
             importlib.util.find_spec(
-                "text_geometry_aligner.json_processing.extractor"
-            )
-        )
-        self.assertIsNone(
-            importlib.util.find_spec(
-                "text_geometry_aligner.json_processing.merger"
+                "text_geometry_aligner.yolo_processing"
             )
         )
         self.assertFalse(hasattr(alignment, "JSONValueExtractor"))

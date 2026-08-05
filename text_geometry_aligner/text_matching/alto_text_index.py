@@ -4,7 +4,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Optional
 
-from ..alto_io import ALTOPage
+from ..io_alto import ALTOPage
 from ..normalization import TextNormalizer
 
 

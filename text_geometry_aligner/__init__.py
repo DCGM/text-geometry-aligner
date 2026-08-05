@@ -1,6 +1,6 @@
 """Bidirectional text/geometry alignment against word-level ALTO OCR."""
 
-from .alto_io import ALTOPage, ALTOReader, ALTOWord
+from .io_alto import ALTOPage, ALTOReader, ALTOWord
 from .base_aligner import BaseAligner
 from .geometry_building import (
     GeometryBuilder,
@@ -22,11 +22,10 @@ from .geometry_matching import (
     create_overlap_calculator,
     create_word_assigner,
 )
-from .json_io import JSONReader, JSONWriter
-from .json_processing import (
-    AlignmentJSONExporter,
-    JSONGeometryExtractor,
-    JSONTextExtractor,
+from .io_json import (
+    AlignmentJSONWriter,
+    JSONGeometryReader,
+    JSONTextReader,
 )
 from .models import (
     AlignmentDocument,
@@ -77,8 +76,7 @@ from .text_matching.candidate_selectors import (
     CandidateSelector,
     PassThroughCandidateSelector,
 )
-from .yolo_io import YOLODetection, YOLOReader
-from .yolo_processing import YOLOGeometryExtractor
+from .io_yolo import YOLODetection, YOLOReader
 
 
 def __getattr__(name: str):
@@ -100,7 +98,7 @@ __all__ = [
     "ALTOWord",
     "AlignmentCandidate",
     "AlignmentDocument",
-    "AlignmentJSONExporter",
+    "AlignmentJSONWriter",
     "AlignmentMode",
     "AlignmentPage",
     "AlignmentRegion",
@@ -127,11 +125,9 @@ __all__ = [
     "GeometryWordAssigner",
     "GreatestCoverageWordAssigner",
     "InputFormat",
-    "JSONGeometryExtractor",
+    "JSONGeometryReader",
     "JSONPath",
-    "JSONReader",
-    "JSONTextExtractor",
-    "JSONWriter",
+    "JSONTextReader",
     "LowercaseTextNormalizer",
     "ALTOWordSpan",
     "OrthogonalPolygonGeometryBuilder",
@@ -161,7 +157,6 @@ __all__ = [
     "WhitespaceTextNormalizer",
     "WordAssignmentStrategy",
     "YOLODetection",
-    "YOLOGeometryExtractor",
     "YOLOReader",
     "create_overlap_calculator",
     "create_word_assigner",

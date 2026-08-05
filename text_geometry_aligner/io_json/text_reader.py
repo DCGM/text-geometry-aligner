@@ -1,7 +1,11 @@
+"""JSON text reader."""
+
 from __future__ import annotations
 
 import copy
+import json
 import logging
+import os
 from pathlib import Path
 from typing import Any, Sequence
 
@@ -11,8 +15,8 @@ from ..utils import _format_json_path
 logger = logging.getLogger(__name__)
 
 
-class JSONTextExtractor:
-    """Find JSON text values with a representable output-geometry location."""
+class JSONTextReader:
+    """Read JSON text values into the shared alignment representation."""
 
     def __init__(
         self,
@@ -30,7 +34,7 @@ class JSONTextExtractor:
             (*ignored_geometry_suffixes, geometry_suffix)
         )
 
-    def extract_alignment_region(
+    def _extract_regions(
         self,
         data: Any,
     ) -> tuple[AlignmentRegion, ...]:
@@ -64,7 +68,11 @@ class JSONTextExtractor:
             if isinstance(node, dict):
                 for key, value in node.items():
                     if not isinstance(key, str):
-                        logger.debug("Skipping non-string JSON object key at %s: %r", path, key)
+                        logger.debug(
+                            "Skipping non-string JSON object key at %s: %r",
+                            path,
+                            key,
+                        )
                         continue
 
                     child_path = path + (key,)
@@ -138,21 +146,38 @@ class JSONTextExtractor:
         visit(data, ())
         return tuple(regions)
 
-    def extract_alignment_page(
+    def from_data(
         self,
         data: Any,
         *,
-        page_key: str,
+        page_key: str = "page",
         input_file_path: Path | None = None,
     ) -> AlignmentPage:
-        """Extract text regions and wrap them in one JSON alignment page."""
+        """Convert in-memory JSON text data into an alignment page."""
 
         return AlignmentPage(
             page_key=page_key,
             input_format=InputFormat.JSON,
-            regions=list(self.extract_alignment_region(data)),
+            regions=list(self._extract_regions(data)),
             input_file_path=input_file_path,
             json_source_data=copy.deepcopy(data),
+        )
+
+    def read(
+        self,
+        input_path: str | os.PathLike[str],
+        *,
+        page_key: str | None = None,
+    ) -> AlignmentPage:
+        """Read one UTF-8 JSON file into an alignment page."""
+
+        path = Path(input_path)
+        with path.open("r", encoding="utf-8") as input_stream:
+            data = json.load(input_stream)
+        return self.from_data(
+            data,
+            page_key=path.stem if page_key is None else page_key,
+            input_file_path=path,
         )
 
 

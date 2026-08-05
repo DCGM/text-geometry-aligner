@@ -1,7 +1,11 @@
+"""JSON geometry reader."""
+
 from __future__ import annotations
 
 import copy
+import json
 import math
+import os
 from numbers import Real
 from pathlib import Path
 from typing import Any
@@ -18,8 +22,8 @@ from ..models import (
 from ..utils import _format_json_path
 
 
-class JSONGeometryExtractor:
-    """Extract suffix-selected geometries and their destination text paths."""
+class JSONGeometryReader:
+    """Read JSON geometries into the shared alignment representation."""
 
     def __init__(
         self,
@@ -31,7 +35,7 @@ class JSONGeometryExtractor:
         self.geometry_suffix = geometry_suffix
         self.overwrite_existing_text = overwrite_existing_text
 
-    def extract_alignment_region(
+    def _extract_regions(
         self,
         data: Any,
     ) -> tuple[AlignmentRegion, ...]:
@@ -114,21 +118,38 @@ class JSONGeometryExtractor:
         visit_document(data, ())
         return tuple(regions)
 
-    def extract_alignment_page(
+    def from_data(
         self,
         data: Any,
         *,
-        page_key: str,
+        page_key: str = "page",
         input_file_path: Path | None = None,
     ) -> AlignmentPage:
-        """Extract geometries and wrap them in one JSON alignment page."""
+        """Convert in-memory JSON geometry data into an alignment page."""
 
         return AlignmentPage(
             page_key=page_key,
             input_format=InputFormat.JSON,
-            regions=list(self.extract_alignment_region(data)),
+            regions=list(self._extract_regions(data)),
             input_file_path=input_file_path,
             json_source_data=copy.deepcopy(data),
+        )
+
+    def read(
+        self,
+        input_path: str | os.PathLike[str],
+        *,
+        page_key: str | None = None,
+    ) -> AlignmentPage:
+        """Read one UTF-8 JSON file into an alignment page."""
+
+        path = Path(input_path)
+        with path.open("r", encoding="utf-8") as input_stream:
+            data = json.load(input_stream)
+        return self.from_data(
+            data,
+            page_key=path.stem if page_key is None else page_key,
+            input_file_path=path,
         )
 
 

@@ -1,3 +1,5 @@
+"""ALTO XML reader and format-specific models."""
+
 from __future__ import annotations
 
 import logging

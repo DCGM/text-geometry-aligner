@@ -7,13 +7,13 @@ from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from pathlib import Path
 
-from .alto_io import ALTOPage, ALTOReader
+from .io_alto import ALTOPage, ALTOReader
 from .geometry_building import (
     GeometryBuilder,
     OrthogonalPolygonGeometryBuilder,
     UnionBoundingBoxGeometryBuilder,
 )
-from .json_io import JSONWriter
+from .io_json import AlignmentJSONWriter
 from .models import (
     AlignmentDocument,
     AlignmentMode,
@@ -63,7 +63,7 @@ def _build_geometry_builder(
 
 
 class BaseAligner(ABC):
-    """Shared document, page pairing, export, and rendering workflow."""
+    """Shared document, page pairing, output, and rendering workflow."""
 
     alignment_mode: AlignmentMode
     supported_input_formats: tuple[InputFormat, ...]
@@ -71,8 +71,8 @@ class BaseAligner(ABC):
     def __init__(
         self,
         *,
+        json_writer: AlignmentJSONWriter,
         alto_reader: ALTOReader | None = None,
-        json_writer: JSONWriter | None = None,
         output_geometry_format: OutputGeometryFormat | str = (
             OutputGeometryFormat.BBOX
         ),
@@ -81,7 +81,7 @@ class BaseAligner(ABC):
         renderer: AlignmentRenderer | None = None,
     ):
         self.alto_reader = alto_reader or ALTOReader()
-        self.json_writer = json_writer or JSONWriter()
+        self.json_writer = json_writer
         self.output_geometry_format = OutputGeometryFormat(
             output_geometry_format
         )
@@ -108,10 +108,6 @@ class BaseAligner(ABC):
         alto_page: ALTOPage,
         page: AlignmentPage,
     ) -> AlignmentPage:
-        raise NotImplementedError
-
-    @abstractmethod
-    def export_page(self, page: AlignmentPage) -> dict[str, object]:
         raise NotImplementedError
 
     @property
@@ -156,7 +152,7 @@ class BaseAligner(ABC):
         self.align_page(parsed_alto, page)
         if json_output_file is not None:
             self.json_writer.write(
-                self.export_page(page),
+                page,
                 Path(json_output_file),
             )
 
@@ -327,7 +323,7 @@ class BaseAligner(ABC):
             self.align_page(parsed_alto, page)
             if output_dir is not None:
                 self.json_writer.write(
-                    self.export_page(page),
+                    page,
                     output_dir / f"{page_key}.json",
                 )
             document.pages.append(page)

@@ -85,7 +85,7 @@ flowchart LR
     MW --> GB["Geometry builder<br/>union bbox / orthogonal polygon"]
     TB --> M["Enriched regions"]
     GB --> M
-    M --> JM["JSON exporter"]
+    M --> JM["JSON writer"]
     JM --> O["Output JSON<br/>*_bbox or *_polygon"]
     M --> R["Optional rendering<br/>text + similarity"]
 ```
@@ -171,7 +171,7 @@ flowchart LR
     MW --> GB["Geometry builder<br/>union bbox / orthogonal polygon"]
     TB --> M["Enriched regions"]
     GB --> M
-    M --> JM["JSON exporter"]
+    M --> JM["JSON writer"]
     JM --> O["Output JSON"]
     M --> R["Optional rendering<br/>text + average overlap"]
 ```
@@ -584,13 +584,35 @@ For rendering, supply both `images_input_dir` and `render_output_dir`. Set
 `fail_on_missing_alto=True` to reject inputs without matching ALTO instead of
 skipping them.
 
+### Format adapters in memory
+
+Format readers create `AlignmentPage` objects from either files or in-memory
+data. JSON has separate readers because text and geometry inputs require
+different extraction rules:
+
+```python
+from text_geometry_aligner import (
+    JSONGeometryReader,
+    JSONTextReader,
+    YOLOReader,
+)
+
+text_page = JSONTextReader().from_data({"title": "Rome"})
+geometry_page = JSONGeometryReader().read("input/page.json")
+yolo_page = YOLOReader().from_data(detections, page_key="page")
+```
+
+`AlignmentJSONWriter.to_data(page)` returns an in-memory dictionary, while
+`AlignmentJSONWriter.write(page, path)` atomically writes the same result to
+disk. The aligners expose their configured writer as `json_writer`.
+
 ## Package structure and extension points
 
 | Area | Responsibility and primary extension points |
 | --- | --- |
-| `alto_io` | Read ALTO into the internal word-level representation |
-| `json_io`, `json_processing` | Read/write JSON, create pages with retained paths, and export enriched pages |
-| `yolo_io`, `yolo_processing` | Read absolute YOLO detections and create geometry regions |
+| `io_alto` | Read ALTO into the internal word-level representation |
+| `io_json` | Read JSON into alignment pages and convert/write enriched pages |
+| `io_yolo` | Read absolute YOLO detections into geometry alignment pages |
 | `text_matching` | Normalized ALTO text indexing, candidate generation, and candidate selection |
 | `geometry_matching` | `GeometryOverlapCalculator` and `GeometryWordAssigner` implementations |
 | `geometry_building` | `GeometryBuilder` implementations used directly by both aligners |
@@ -610,5 +632,5 @@ empty assignment.
 `BaseAligner` provides the shared ALTO text/geometry builder configuration and
 CLI options, single-file, file-collection, and directory processing, output
 writing, filename pairing, category validation, and optional rendering for
-both directions. Input adapters and exporters are intentionally separate from
+both directions. Input adapters and writers are intentionally separate from
 the matching algorithms so additional formats can reuse the same hierarchy.

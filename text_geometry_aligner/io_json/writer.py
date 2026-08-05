@@ -1,8 +1,13 @@
+"""Alignment JSON writer."""
+
 from __future__ import annotations
 
 import copy
+import json
+import os
 from collections import OrderedDict
 from collections.abc import MutableMapping, MutableSequence
+from pathlib import Path
 from typing import Any
 
 from ..models import (
@@ -21,8 +26,8 @@ from ..models import (
 from ..utils import _format_json_path
 
 
-class AlignmentJSONExporter:
-    """Export a shared alignment page to JSON."""
+class AlignmentJSONWriter:
+    """Convert alignment pages to JSON data and atomically write them."""
 
     def __init__(
         self,
@@ -47,12 +52,36 @@ class AlignmentJSONExporter:
             output_geometry_source
         )
 
-    def export(self, page: AlignmentPage) -> dict[str, Any]:
+    def to_data(self, page: AlignmentPage) -> dict[str, Any]:
         if page.input_format is InputFormat.YOLO:
-            return self._export_grouped(page)
-        return self._export_original_json(page)
+            return self._to_grouped_data(page)
+        return self._to_original_data(page)
 
-    def _export_original_json(
+    def write(
+        self,
+        page: AlignmentPage,
+        output_path: str | os.PathLike[str],
+    ) -> None:
+        """Atomically write one alignment page as UTF-8 JSON."""
+
+        path = Path(output_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary_path = path.with_name(f".{path.name}.tmp")
+        try:
+            with temporary_path.open("w", encoding="utf-8") as output_stream:
+                json.dump(
+                    self.to_data(page),
+                    output_stream,
+                    ensure_ascii=False,
+                    indent=2,
+                )
+                output_stream.write("\n")
+            os.replace(temporary_path, path)
+        finally:
+            if temporary_path.exists():
+                temporary_path.unlink()
+
+    def _to_original_data(
         self,
         page: AlignmentPage,
     ) -> dict[str, Any]:
@@ -70,12 +99,12 @@ class AlignmentJSONExporter:
             _create_missing_geometry_destinations(output, page.regions)
         for region in page.regions:
             if self.alignment_mode is AlignmentMode.TEXT:
-                self._export_text_alignment_region(output, region)
+                self._update_text_alignment_region(output, region)
             else:
-                self._export_geometry_alignment_region(output, region)
+                self._update_geometry_alignment_region(output, region)
         return output
 
-    def _export_text_alignment_region(
+    def _update_text_alignment_region(
         self,
         output: dict[str, Any],
         region: AlignmentRegion,
@@ -101,7 +130,7 @@ class AlignmentJSONExporter:
                 region.alto_text,
             )
 
-    def _export_geometry_alignment_region(
+    def _update_geometry_alignment_region(
         self,
         output: dict[str, Any],
         region: AlignmentRegion,
@@ -126,7 +155,7 @@ class AlignmentJSONExporter:
                 None if geometry is None else geometry.to_json(),
             )
 
-    def _export_grouped(self, page: AlignmentPage) -> dict[str, Any]:
+    def _to_grouped_data(self, page: AlignmentPage) -> dict[str, Any]:
         grouped: OrderedDict[str, list[AlignmentRegion]] = OrderedDict()
         for region in page.regions:
             grouped.setdefault(region.label, []).append(region)

@@ -53,12 +53,12 @@ def _bbox(
 
 
 def _output(aligner, document):
-    return aligner.export_page(document.pages[0])
+    return aligner.json_writer.to_data(document.pages[0])
 
 
-class JSONGeometryExtractorTests(unittest.TestCase):
+class JSONGeometryReaderTests(unittest.TestCase):
     def test_extracts_nested_bbox_lists_and_retains_parallel_paths(self) -> None:
-        regions = alignment.JSONGeometryExtractor().extract_alignment_region(
+        regions = alignment.JSONGeometryReader().from_data(
             {
                 "groups": [
                     {
@@ -70,7 +70,7 @@ class JSONGeometryExtractorTests(unittest.TestCase):
                     }
                 ]
             }
-        )
+        ).regions
 
         self.assertEqual(
             [region.json_geometry_path for region in regions],
@@ -102,29 +102,29 @@ class JSONGeometryExtractorTests(unittest.TestCase):
         }
 
         regions = (
-            alignment.JSONGeometryExtractor().extract_alignment_region(data)
+            alignment.JSONGeometryReader().from_data(data).regions
         )
-        overwritten = alignment.JSONGeometryExtractor(
+        overwritten = alignment.JSONGeometryReader(
             overwrite_existing_text=True
-        ).extract_alignment_region(data)
+        ).from_data(data).regions
 
-        self.assertEqual(regions, ())
+        self.assertEqual(regions, [])
         self.assertEqual(len(overwritten), 2)
 
     def test_protected_destination_skips_geometry_parsing(self) -> None:
-        regions = alignment.JSONGeometryExtractor().extract_alignment_region(
+        regions = alignment.JSONGeometryReader().from_data(
             {
                 "title": "existing",
                 "title_bbox": {"not": "a bbox"},
             }
-        )
+        ).regions
 
-        self.assertEqual(regions, ())
+        self.assertEqual(regions, [])
 
     def test_custom_suffix_can_extract_polygon(self) -> None:
-        regions = alignment.JSONGeometryExtractor(
+        regions = alignment.JSONGeometryReader(
             geometry_suffix="_shape"
-        ).extract_alignment_region(
+        ).from_data(
             {
                 "title_shape": [
                     [0, 0],
@@ -134,40 +134,40 @@ class JSONGeometryExtractorTests(unittest.TestCase):
                     [0, 0],
                 ]
             }
-        )
+        ).regions
 
         self.assertEqual(regions[0].json_text_path, ("title",))
         self.assertIsInstance(regions[0].input_geometry, alignment.Polygon)
 
     def test_invalid_geometry_reports_its_json_path(self) -> None:
         with self.assertRaisesRegex(ValueError, r"\$\.title_bbox"):
-            alignment.JSONGeometryExtractor().extract_alignment_region(
+            alignment.JSONGeometryReader().from_data(
                 {"title_bbox": {"x": 0, "y": 0, "width": 10}}
             )
 
 
-class AlignmentJSONExporterTests(unittest.TestCase):
+class AlignmentJSONWriterTests(unittest.TestCase):
     @staticmethod
     def _page(
         data,
         *,
         overwrite_existing_text: bool = False,
     ) -> alignment.AlignmentPage:
-        extractor = alignment.JSONGeometryExtractor(
+        reader = alignment.JSONGeometryReader(
             overwrite_existing_text=overwrite_existing_text
         )
-        return extractor.extract_alignment_page(
+        return reader.from_data(
             data,
             page_key="page",
         )
 
     @staticmethod
     def _export(page: alignment.AlignmentPage):
-        return alignment.AlignmentJSONExporter(
+        return alignment.AlignmentJSONWriter(
             alignment_mode=alignment.AlignmentMode.GEOMETRY,
             geometry_suffix="_bbox",
             output_geometry_format=alignment.OutputGeometryFormat.BBOX,
-        ).export(page)
+        ).to_data(page)
 
     def test_missing_list_destination_mirrors_trailing_null_shape(self) -> None:
         page = self._page(

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Callable, Sequence
 
-from ..alto_io import ALTOWord
+from ..io_alto import ALTOWord
 from ..models import (
     AlignmentRegion,
     BoundingBox,
