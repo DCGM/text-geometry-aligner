@@ -78,7 +78,7 @@ from .text_matching.candidate_selectors import (
     CandidateSelector,
     PassThroughCandidateSelector,
 )
-from .io_yolo import YOLODetection, YOLOReader
+from .io_yolo import LabelDeduplicationGroup, YOLODetection, YOLOReader
 
 
 def __getattr__(name: str):
@@ -132,6 +132,7 @@ __all__ = [
     "JSONTextReader",
     "LabelStudioReader",
     "LabelStudioWriter",
+    "LabelDeduplicationGroup",
     "LabelMapper",
     "LowercaseTextNormalizer",
     "ALTOWordSpan",

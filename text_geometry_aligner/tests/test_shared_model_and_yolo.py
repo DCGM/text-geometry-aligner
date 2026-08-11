@@ -209,6 +209,26 @@ class SharedAlignmentModelTests(unittest.TestCase):
 
 
 class YOLOAdapterTests(unittest.TestCase):
+    @staticmethod
+    def _detection(
+        label: str,
+        confidence: float,
+        *,
+        center_x: float = 50,
+        center_y: float = 50,
+        width: float = 40,
+        height: float = 20,
+    ) -> alignment.YOLODetection:
+        return alignment.YOLODetection(
+            category_id=0,
+            center_x=center_x,
+            center_y=center_y,
+            width=width,
+            height=height,
+            confidence=confidence,
+            class_name=label,
+        )
+
     def test_reader_logs_page_before_suspicious_region_warning(self) -> None:
         with self.assertLogs(
             "text_geometry_aligner",
@@ -307,6 +327,116 @@ class YOLOAdapterTests(unittest.TestCase):
                 "Inconsistent YOLO class mapping",
             ):
                 alignment.YOLOReader().read(path)
+
+    def test_reader_optionally_deduplicates_cross_class_regions(self) -> None:
+        reader = alignment.YOLOReader(
+            label_deduplication_groups=[
+                alignment.LabelDeduplicationGroup(
+                    labels=frozenset({"Chapter", "Subchapter"}),
+                    minimum_coverage=0.8,
+                )
+            ]
+        )
+
+        page = reader.from_data(
+            [
+                self._detection("Chapter", 0.7),
+                self._detection("Subchapter", 0.9),
+                self._detection("Other", 0.5),
+            ]
+        )
+
+        self.assertEqual(
+            [(region.region_id, region.label) for region in page.regions],
+            [(1, "Subchapter"), (2, "Other")],
+        )
+
+    def test_reader_deduplication_preserves_same_class_regions(self) -> None:
+        reader = alignment.YOLOReader(
+            label_deduplication_groups=[
+                alignment.LabelDeduplicationGroup(
+                    labels=frozenset({"Chapter", "Subchapter"}),
+                    minimum_coverage=0.8,
+                )
+            ]
+        )
+
+        page = reader.from_data(
+            [
+                self._detection("Chapter", 0.7),
+                self._detection("Chapter", 0.9),
+            ]
+        )
+
+        self.assertEqual([region.region_id for region in page.regions], [0, 1])
+
+    def test_reader_deduplication_requires_coverage_of_larger_box(
+        self,
+    ) -> None:
+        reader = alignment.YOLOReader(
+            label_deduplication_groups=[
+                alignment.LabelDeduplicationGroup(
+                    labels=frozenset({"Chapter", "Subchapter"}),
+                    minimum_coverage=0.8,
+                )
+            ]
+        )
+
+        page = reader.from_data(
+            [
+                self._detection("Chapter", 0.9),
+                self._detection(
+                    "Subchapter",
+                    0.8,
+                    width=10,
+                    height=10,
+                ),
+            ]
+        )
+
+        self.assertEqual([region.region_id for region in page.regions], [0, 1])
+
+    def test_reader_deduplication_tie_retains_first_detection(self) -> None:
+        reader = alignment.YOLOReader(
+            label_deduplication_groups=[
+                alignment.LabelDeduplicationGroup(
+                    labels=frozenset({"Chapter", "Subchapter"}),
+                    minimum_coverage=1.0,
+                )
+            ]
+        )
+
+        page = reader.from_data(
+            [
+                self._detection("Chapter", 0.9),
+                self._detection("Subchapter", 0.9),
+            ]
+        )
+
+        self.assertEqual(
+            [(region.region_id, region.label) for region in page.regions],
+            [(0, "Chapter")],
+        )
+
+    def test_reader_rejects_label_in_multiple_deduplication_groups(
+        self,
+    ) -> None:
+        with self.assertRaisesRegex(
+            ValueError,
+            "cannot belong to multiple deduplication groups",
+        ):
+            alignment.YOLOReader(
+                label_deduplication_groups=[
+                    alignment.LabelDeduplicationGroup(
+                        labels=frozenset({"Chapter", "Subchapter"}),
+                        minimum_coverage=0.8,
+                    ),
+                    alignment.LabelDeduplicationGroup(
+                        labels=frozenset({"Subchapter", "Other"}),
+                        minimum_coverage=0.7,
+                    ),
+                ]
+            )
 
     def test_yolo_export_groups_repeated_labels_and_retains_input_boxes(
         self,
