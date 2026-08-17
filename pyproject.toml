@@ -11,7 +11,7 @@ requires-python = ">=3.10"
 dependencies = [
     "Levenshtein~=0.27.3",
     "ortools~=9.14.6206",
-    "Pillow~=10.0.1",
+    "Pillow>=10.0.1",
     "Shapely~=2.1.2",
 ]
 
