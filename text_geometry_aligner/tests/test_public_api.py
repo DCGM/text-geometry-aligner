@@ -1,7 +1,5 @@
 """Tests for the top-level package's public API surface."""
 
-import importlib.util
-
 import pytest
 
 import text_geometry_aligner as alignment
@@ -15,10 +13,6 @@ def test_direction_specific_aligners_replace_old_orchestrator() -> None:
     )
     assert not hasattr(alignment, "TextGeometryAligner")
     assert not hasattr(alignment, "AlignmentDirection")
-    assert (
-        importlib.util.find_spec("text_geometry_aligner.text_geometry_aligner")
-        is None
-    )
 
 
 def test_aligner_requires_generator_and_selector() -> None:

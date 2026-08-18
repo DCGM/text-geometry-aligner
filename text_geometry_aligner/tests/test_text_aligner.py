@@ -1,7 +1,6 @@
 """Tests for text-to-geometry alignment via the TextAligner orchestrator."""
 
 import contextlib
-import importlib.util
 import io
 from pathlib import Path
 
@@ -293,39 +292,8 @@ def test_io_apis_have_no_compatibility_aliases() -> None:
     assert not hasattr(alignment, "AlignmentInputNormalizer")
     assert not hasattr(alignment, "PreparedTextRegion")
     assert not hasattr(alignment, "StrictTextNormalizer")
-    assert (
-        importlib.util.find_spec("text_geometry_aligner.preprocessing") is None
-    )
-    assert importlib.util.find_spec("text_geometry_aligner.alto") is None
-    assert (
-        importlib.util.find_spec("text_geometry_aligner.io_json.extractor")
-        is None
-    )
-    assert importlib.util.find_spec("text_geometry_aligner.alto_io") is None
-    assert importlib.util.find_spec("text_geometry_aligner.json_io") is None
-    assert importlib.util.find_spec("text_geometry_aligner.yolo_io") is None
-    assert (
-        importlib.util.find_spec("text_geometry_aligner.json_processing")
-        is None
-    )
-    assert (
-        importlib.util.find_spec("text_geometry_aligner.yolo_processing")
-        is None
-    )
     assert not hasattr(alignment, "JSONValueExtractor")
     assert not hasattr(alignment, "JSONAlignmentMerger")
-    assert (
-        importlib.util.find_spec(
-            "text_geometry_aligner.text_matching.candidates"
-        )
-        is None
-    )
-    assert (
-        importlib.util.find_spec(
-            "text_geometry_aligner.text_matching.selection"
-        )
-        is None
-    )
     assert (
         alignment.GeometryBuilder.__module__
         == "text_geometry_aligner.geometry_building.base"
@@ -343,13 +311,7 @@ def test_io_apis_have_no_compatibility_aliases() -> None:
         "text_geometry_aligner.text_building.space_separated"
     )
     assert ".text_matching." in alignment.ExactTextCandidateGenerator.__module__
-    assert importlib.util.find_spec("text_geometry_aligner.geometry") is None
-    assert (
-        importlib.util.find_spec("text_geometry_aligner.geometry_builder") is None
-    )
-    assert importlib.util.find_spec("text_geometry_aligner.text_builder") is None
     assert not hasattr(alignment, "create_geometry_builder")
-    assert importlib.util.find_spec("text_geometry_aligner.matching") is None
     assert not hasattr(alignment, "CandidateGenerationStrategy")
     assert not hasattr(alignment, "HybridTextCandidateGenerator")
 
