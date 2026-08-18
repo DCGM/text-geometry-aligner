@@ -169,7 +169,7 @@ def test_source_json_keys_remain_original() -> None:
     assert "heading" not in output
 
 
-def test_yolo_export_groups_repeated_labels_and_retains_input_boxes() -> None:
+def test_writer_groups_repeated_labels_and_retains_input_boxes() -> None:
     page = alignment.AlignmentPage(
         page_key="page",
         input_format=alignment.InputFormat.YOLO,
@@ -207,7 +207,7 @@ def test_yolo_export_groups_repeated_labels_and_retains_input_boxes() -> None:
     assert page.regions[0].category_id == 0
 
 
-def test_yolo_export_rejects_class_names_that_collide_with_suffix_keys() -> None:
+def test_writer_rejects_labels_that_collide_with_suffix_keys() -> None:
     page = alignment.AlignmentPage(
         page_key="page",
         input_format=alignment.InputFormat.YOLO,
