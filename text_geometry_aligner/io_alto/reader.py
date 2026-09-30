@@ -25,8 +25,8 @@ class ALTOWord:
     block_index: Optional[int] = None
     # The String's and its TextLine's ALTO ID attributes, when the ALTO has
     # them; many producers write IDs on lines only, or on neither.
-    element_id: Optional[str] = None
-    line_id: Optional[str] = None
+    alto_word_id: Optional[str] = None
+    alto_line_id: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -108,8 +108,8 @@ class ALTOReader:
                         ),
                         line_index=current_line,
                         block_index=current_block,
-                        element_id=element.attrib.get("ID"),
-                        line_id=current_line_id,
+                        alto_word_id=element.attrib.get("ID"),
+                        alto_line_id=current_line_id,
                     )
                 )
 

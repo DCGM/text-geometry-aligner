@@ -249,8 +249,8 @@ class TextAligner(BaseAligner):
                     ),
                     line_index=word.line_index,
                     block_index=word.block_index,
-                    element_id=word.element_id,
-                    line_id=word.line_id,
+                    alto_word_id=word.alto_word_id,
+                    alto_line_id=word.alto_line_id,
                 )
                 for word in matched_words
             ]

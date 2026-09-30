@@ -27,8 +27,8 @@ def test_alto_reader_only_parses_xml_into_page_model(tmp_path) -> None:
     assert (page.width, page.height) == (100.0, 200.0)
     assert len(page.words) == 1
     assert page.words[0].text == "ROME"
-    assert page.words[0].element_id == "word-1"
-    assert page.words[0].line_id is None
+    assert page.words[0].alto_word_id == "word-1"
+    assert page.words[0].alto_line_id is None
     assert page.words[0].bbox == alignment.BoundingBox(1.0, 2.0, 30.0, 10.0)
 
 
@@ -58,7 +58,7 @@ def test_alto_reader_keeps_line_and_word_ids_only_where_the_alto_has_them(tmp_pa
 
     page = alignment.ALTOReader().read(input_path)
 
-    assert [(word.element_id, word.line_id) for word in page.words] == [
+    assert [(word.alto_word_id, word.alto_line_id) for word in page.words] == [
         ("word-1", "line-1"),
         (None, "line-1"),
         (None, None),

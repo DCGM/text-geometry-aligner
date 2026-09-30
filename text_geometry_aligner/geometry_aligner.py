@@ -235,8 +235,8 @@ class GeometryAligner(BaseAligner):
                             overlap_score=overlap.overlap_score,
                             line_index=word.line_index,
                             block_index=word.block_index,
-                            element_id=word.element_id,
-                            line_id=word.line_id,
+                            alto_word_id=word.alto_word_id,
+                            alto_line_id=word.alto_line_id,
                         )
                         for word, overlap in zip(
                             words,
