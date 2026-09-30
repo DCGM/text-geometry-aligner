@@ -23,10 +23,12 @@ class ALTOWord:
     bbox: BoundingBox
     line_index: Optional[int] = None
     block_index: Optional[int] = None
-    # The String's and its TextLine's ALTO ID attributes, when the ALTO has
-    # them; many producers write IDs on lines only, or on neither.
+    # The ALTO ID attributes of the String and of its TextLine and TextBlock,
+    # when the ALTO has them. Producers differ: most write IDs on blocks, many
+    # on lines too, few on words.
     alto_word_id: Optional[str] = None
     alto_line_id: Optional[str] = None
+    alto_block_id: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -73,6 +75,7 @@ class ALTOReader:
             current_block: Optional[int],
             current_line: Optional[int],
             current_line_id: Optional[str],
+            current_block_id: Optional[str],
         ) -> None:
             nonlocal block_index, line_index
 
@@ -80,6 +83,7 @@ class ALTOReader:
             if name == "TextBlock":
                 block_index += 1
                 current_block = block_index
+                current_block_id = element.attrib.get("ID")
             elif name == "TextLine":
                 line_index += 1
                 current_line = line_index
@@ -110,13 +114,14 @@ class ALTOReader:
                         block_index=current_block,
                         alto_word_id=element.attrib.get("ID"),
                         alto_line_id=current_line_id,
+                        alto_block_id=current_block_id,
                     )
                 )
 
             for child in element:
-                visit(child, current_block, current_line, current_line_id)
+                visit(child, current_block, current_line, current_line_id, current_block_id)
 
-        visit(root, None, None, None)
+        visit(root, None, None, None, None)
 
         if page_element is None:
             logger.warning("Missing Page element in ALTO file %s", path)

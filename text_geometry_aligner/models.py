@@ -160,10 +160,11 @@ class AlignmentWord:
     overlap_score: float | None = None
     line_index: int | None = None
     block_index: int | None = None
-    # ALTO ID attributes of the word's String and of its TextLine, None where
-    # the ALTO does not provide them.
+    # ALTO ID attributes of the word's String and of its TextLine and
+    # TextBlock, None where the ALTO does not provide them.
     alto_word_id: str | None = None
     alto_line_id: str | None = None
+    alto_block_id: str | None = None
 
 
 @dataclass

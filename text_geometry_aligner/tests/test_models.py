@@ -119,6 +119,7 @@ def test_input_region_is_populated_in_place() -> None:
                     block_index=1,
                     alto_word_id="word-id",
                     alto_line_id="line-id",
+                    alto_block_id="block-id",
                 ),
             ),
         ),
@@ -128,7 +129,9 @@ def test_input_region_is_populated_in_place() -> None:
     assert region.alto_text == "12"
     assert region.alto_geometry == input_geometry
     assert region.words[0].word_index == 7
-    assert (region.words[0].alto_word_id, region.words[0].alto_line_id) == ("word-id", "line-id")
+    assert (region.words[0].alto_word_id, region.words[0].alto_line_id, region.words[0].alto_block_id) == (
+        "word-id", "line-id", "block-id",
+    )
     assert region.words[0].text_normalized is None
     assert region.words[0].word_coverage == 1.0
     assert region.words[0].input_geometry_coverage == 1.0

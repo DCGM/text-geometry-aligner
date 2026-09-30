@@ -29,15 +29,16 @@ def test_alto_reader_only_parses_xml_into_page_model(tmp_path) -> None:
     assert page.words[0].text == "ROME"
     assert page.words[0].alto_word_id == "word-1"
     assert page.words[0].alto_line_id is None
+    assert page.words[0].alto_block_id is None
     assert page.words[0].bbox == alignment.BoundingBox(1.0, 2.0, 30.0, 10.0)
 
 
-def test_alto_reader_keeps_line_and_word_ids_only_where_the_alto_has_them(tmp_path) -> None:
+def test_alto_reader_keeps_block_line_and_word_ids_only_where_the_alto_has_them(tmp_path) -> None:
     alto_xml = """\
 <alto xmlns="http://www.loc.gov/standards/alto/ns-v2#">
   <Layout>
     <Page WIDTH="100" HEIGHT="200">
-      <TextBlock>
+      <TextBlock ID="block-1">
         <TextLine ID="line-1">
           <String ID="word-1" CONTENT="ROMA"
                   HPOS="1" VPOS="2" WIDTH="30" HEIGHT="10"/>
@@ -49,6 +50,12 @@ def test_alto_reader_keeps_line_and_word_ids_only_where_the_alto_has_them(tmp_pa
                   HPOS="1" VPOS="20" WIDTH="30" HEIGHT="10"/>
         </TextLine>
       </TextBlock>
+      <TextBlock>
+        <TextLine>
+          <String CONTENT="FINIS"
+                  HPOS="1" VPOS="40" WIDTH="30" HEIGHT="10"/>
+        </TextLine>
+      </TextBlock>
     </Page>
   </Layout>
 </alto>
@@ -58,8 +65,9 @@ def test_alto_reader_keeps_line_and_word_ids_only_where_the_alto_has_them(tmp_pa
 
     page = alignment.ALTOReader().read(input_path)
 
-    assert [(word.alto_word_id, word.alto_line_id) for word in page.words] == [
-        ("word-1", "line-1"),
-        (None, "line-1"),
-        (None, None),
+    assert [(word.alto_word_id, word.alto_line_id, word.alto_block_id) for word in page.words] == [
+        ("word-1", "line-1", "block-1"),
+        (None, "line-1", "block-1"),
+        (None, None, "block-1"),
+        (None, None, None),
     ]
