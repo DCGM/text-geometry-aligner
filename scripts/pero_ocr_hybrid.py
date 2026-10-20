@@ -13,7 +13,7 @@ whose outputs already exist are skipped, so an interrupted run can be resumed.
 
 Run with the pero-ocr environment, e.g.
     ~/python_env/pero-ocr/bin/python scripts/pero_ocr_hybrid.py IMAGES_DIR \
-        --alto-dir ALTO_DIR --page-xml-dir PAGE_XML_DIR --pair universal
+        --alto-dir ALTO_DIR --page-xml-dir PAGE_XML_DIR --pair printed
 """
 
 from __future__ import annotations
@@ -82,7 +82,7 @@ def main() -> None:
     arg_parser.add_argument("images", type=Path, help="folder of page images")
     arg_parser.add_argument("--alto-dir", type=Path, required=True)
     arg_parser.add_argument("--page-xml-dir", type=Path, required=True)
-    arg_parser.add_argument("--pair", choices=PAIRS, default="universal", help="transformer + CTC model pair")
+    arg_parser.add_argument("--pair", choices=PAIRS, default="printed", help="transformer + CTC model pair")
     arg_parser.add_argument("--limit", type=int, help="process at most this many pages")
     args = arg_parser.parse_args()
 
