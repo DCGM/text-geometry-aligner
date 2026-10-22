@@ -10,6 +10,9 @@ words where they are printed.
 
 Writes <stem>.xml into --alto-dir and --page-xml-dir for every image. Pages
 whose outputs already exist are skipped, so an interrupted run can be resumed.
+Dense pages are CPU-bound on one core; to use more, start several runs on the
+same folder with --shard 0/N, 1/N, ... (each loads its own engines, ~3 GB GPU
+and ~2 GB RAM).
 
 Run with the pero-ocr environment, e.g.
     ~/python_env/pero-ocr/bin/python scripts/pero_ocr_hybrid.py IMAGES_DIR \
@@ -84,7 +87,13 @@ def main() -> None:
     arg_parser.add_argument("--page-xml-dir", type=Path, required=True)
     arg_parser.add_argument("--pair", choices=PAIRS, default="printed", help="transformer + CTC model pair")
     arg_parser.add_argument("--limit", type=int, help="process at most this many pages")
+    arg_parser.add_argument("--shard", default="0/1", metavar="I/N",
+                            help="process only every N-th image starting with the I-th (0-based), so N runs started "
+                                 "with 0/N .. N-1/N share the folder without overlap")
     args = arg_parser.parse_args()
+    shard, shards = (int(part) for part in args.shard.split("/"))
+    if not 0 <= shard < shards:
+        arg_parser.error(f"--shard {args.shard}: I must be in 0..N-1")
 
     logging.basicConfig(level=logging.WARNING)
     import torch
@@ -94,7 +103,7 @@ def main() -> None:
 
     args.alto_dir.mkdir(parents=True, exist_ok=True)
     args.page_xml_dir.mkdir(parents=True, exist_ok=True)
-    paths = sorted(p for p in args.images.iterdir() if p.suffix.lower() in IMAGE_SUFFIXES)
+    paths = sorted(p for p in args.images.iterdir() if p.suffix.lower() in IMAGE_SUFFIXES)[shard::shards]
     todo = [p for p in paths
             if not ((args.alto_dir / f"{p.stem}.xml").exists() and (args.page_xml_dir / f"{p.stem}.xml").exists())]
     if args.limit is not None:
