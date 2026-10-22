@@ -191,3 +191,19 @@ def test_json_text_reader_maps_regions(label_mapper) -> None:
     )
 
     assert (region.label, region.label_export) == ("Title", "heading")
+
+
+def test_skipped_keys_yield_no_regions_at_any_depth() -> None:
+    values = alignment.JSONTextReader(skip_keys=("lang", "role")).from_data(
+        {
+            "title": "Rome",
+            "lang": "lat",
+            "agents": [{"role": "author", "name": "Livy"}],
+            "notes": {"lang": ["lat", "grc"]},
+        }
+    ).regions
+
+    assert [value.json_text_path for value in values] == [
+        ("title",),
+        ("agents", 0, "name"),
+    ]

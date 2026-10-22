@@ -30,6 +30,7 @@ class JSONTextReader:
         overwrite_existing_geometry: bool = False,
         ignored_geometry_suffixes: Sequence[str] = ("_bbox", "_polygon"),
         label_mapper: LabelMapper | None = None,
+        skip_keys: Sequence[str] = (),
     ):
         if not geometry_suffix:
             raise ValueError("geometry_suffix must not be empty")
@@ -38,6 +39,9 @@ class JSONTextReader:
         self.geometry_suffix = geometry_suffix
         self.overwrite_existing_geometry = overwrite_existing_geometry
         self.label_mapper = label_mapper
+        # Values under these keys, nested ones too, are not transcriptions
+        # to align (codes, flags); they get no geometry key.
+        self.skip_keys = frozenset(skip_keys)
         self.ignored_geometry_suffixes = frozenset(
             (*ignored_geometry_suffixes, geometry_suffix)
         )
@@ -85,6 +89,8 @@ class JSONTextReader:
                         continue
 
                     child_path = path + (key,)
+                    if key in self.skip_keys:
+                        continue
                     if any(
                         key.endswith(suffix)
                         for suffix in self.ignored_geometry_suffixes

@@ -93,3 +93,31 @@ def test_rendering_converts_selected_geometry_to_requested_format() -> None:
         (1, 6),
         (1, 2),
     )
+
+
+def test_labels_carry_the_field_name_on_request() -> None:
+    page = alignment.JSONTextReader().from_data(
+        {"publication": [{"placeTerm": ["Praha"]}], "title": "Rome"},
+        page_key="page",
+    )
+    for region in page.regions:
+        region.alto_geometry = alignment.BoundingBox(1, 2, 3, 4)
+        region.alignment_score = 1.0
+
+    rendered = alignment.PillowAlignmentRenderer._render_alignments(
+        page,
+        alignment.OutputTextSource.JSON,
+        alignment.OutputGeometrySource.ALTO,
+        alignment.OutputGeometryFormat.BBOX,
+    )
+    plain = alignment.PillowAlignmentRenderer()
+    named = alignment.PillowAlignmentRenderer(show_field_names=True)
+
+    assert [plain._build_label(item) for item in rendered] == [
+        "Praha [1.00]",
+        "Rome [1.00]",
+    ]
+    assert [named._build_label(item) for item in rendered] == [
+        "publication.placeTerm: Praha [1.00]",
+        "title: Rome [1.00]",
+    ]

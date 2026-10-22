@@ -94,6 +94,24 @@ def test_reconstructs_nested_output_from_retained_paths() -> None:
     }
 
 
+def test_geometry_keys_follow_their_values() -> None:
+    page = alignment.JSONTextReader().from_data(
+        {"title": "Rome", "lang": "lat", "places": [{"name": "Rome", "code": "R"}]},
+        page_key="page",
+    )
+    for region in page.regions:
+        region.alto_geometry = alignment.BoundingBox(1, 2, 3, 4)
+    output_data = alignment.AlignmentJSONWriter(
+        alignment_mode=alignment.AlignmentMode.TEXT,
+        geometry_suffix="_bbox",
+        output_geometry_format=alignment.OutputGeometryFormat.BBOX,
+        output_geometry_source=alignment.OutputGeometrySource.ALTO,
+    ).to_data(page)
+
+    assert list(output_data) == ["title", "title_bbox", "lang", "lang_bbox", "places"]
+    assert list(output_data["places"][0]) == ["name", "name_bbox", "code", "code_bbox"]
+
+
 def test_alignment_json_writer_writes_utf8_atomically(tmp_path) -> None:
     data = {"title": "Řím", "publishers": ["Šolc"]}
     page = alignment.AlignmentPage(

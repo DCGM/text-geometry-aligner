@@ -9,6 +9,7 @@ from typing import Any, Optional, Sequence
 
 from .models import (
     AlignmentPage,
+    AlignmentRegion,
     BoundingBox,
     OutputGeometry,
     OutputGeometryFormat,
@@ -45,6 +46,7 @@ class RenderAlignment:
     geometry: OutputGeometry
     text: str
     score: float
+    field: str | None = None
 
 
 class AlignmentRenderer(ABC):
@@ -105,6 +107,7 @@ class PillowAlignmentRenderer(AlignmentRenderer):
         font_size: int = 36,
         label_padding: int = 3,
         font_path: Optional[str | os.PathLike[str]] = None,
+        show_field_names: bool = False,
     ):
         if line_width <= 0:
             raise ValueError("line_width must be positive")
@@ -116,6 +119,7 @@ class PillowAlignmentRenderer(AlignmentRenderer):
         self.font_size = font_size
         self.label_padding = label_padding
         self.font_path = Path(font_path) if font_path is not None else None
+        self.show_field_names = show_field_names
 
     def render(
         self,
@@ -340,6 +344,7 @@ class PillowAlignmentRenderer(AlignmentRenderer):
                     geometry=geometry,
                     text="null" if text_value is None else str(text_value),
                     score=region.alignment_score or 0.0,
+                    field=_field_name(region),
                 )
             )
         return tuple(alignments)
@@ -489,4 +494,20 @@ class PillowAlignmentRenderer(AlignmentRenderer):
         self,
         alignment: RenderAlignment,
     ) -> str:
-        return f"{alignment.text} [{alignment.score:.2f}]"
+        text = (
+            f"{alignment.field}: {alignment.text}"
+            if self.show_field_names and alignment.field
+            else alignment.text
+        )
+        return f"{text} [{alignment.score:.2f}]"
+
+
+def _field_name(region: AlignmentRegion) -> str:
+    """Dotted JSON keys of the value ("publication.placeTerm"), else its label."""
+
+    keys = [
+        component
+        for component in region.json_text_path or ()
+        if isinstance(component, str)
+    ]
+    return ".".join(keys) if keys else region.label_for_export

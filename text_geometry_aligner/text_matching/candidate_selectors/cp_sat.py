@@ -83,6 +83,20 @@ class CPSATCandidateSelector(CandidateSelector):
         self._maximize_and_fix(model, exact_count, cp_model, "exact matches")
         self._maximize_and_fix(model, matched_count, cp_model, "matched values")
 
+        # Equally good fuzzy spans can differ by a stray word at an edge
+        # (substituting it costs no more than leaving the query characters
+        # unmatched); the tighter span leaves that word to other values.
+        matched_word_count = sum(
+            selected[candidate.candidate_id] * len(candidate.word_indexes)
+            for candidate in candidates
+        )
+        self._minimize_and_fix(
+            model,
+            matched_word_count,
+            cp_model,
+            "matched ALTO words",
+        )
+
         alto_start_cost = sum(
             selected[candidate.candidate_id] * candidate.start_word
             for candidate in candidates

@@ -105,7 +105,7 @@ class AlignmentJSONWriter:
                 self._update_text_alignment_region(output, region)
             else:
                 self._update_geometry_alignment_region(output, region)
-        return output
+        return _pair_values_with_geometry(output, self.geometry_suffix)
 
     def _update_text_alignment_region(
         self,
@@ -260,6 +260,43 @@ def _create_missing_geometry_destinations(
             _empty_geometry_shape(source_container),
         )
         initialized_paths.add(geometry_container_path)
+
+
+def _pair_values_with_geometry(node: Any, geometry_suffix: str) -> Any:
+    """Copy of node with every geometry key right next to its value key.
+
+    The pair takes the place of whichever of the two came first, so a geometry
+    key created at the end of an object moves up to its value.
+    """
+
+    if isinstance(node, MutableSequence):
+        return [_pair_values_with_geometry(item, geometry_suffix) for item in node]
+    if not isinstance(node, MutableMapping):
+        return node
+
+    result: dict[Any, Any] = {}
+    for key in node:
+        if key in result:
+            continue
+        value_key = key
+        if (
+            isinstance(key, str)
+            and key.endswith(geometry_suffix)
+            and key[: -len(geometry_suffix)] in node
+        ):
+            value_key = key[: -len(geometry_suffix)]
+        result[value_key] = _pair_values_with_geometry(
+            node[value_key],
+            geometry_suffix,
+        )
+        geometry_key = (
+            f"{value_key}{geometry_suffix}"
+            if isinstance(value_key, str)
+            else None
+        )
+        if geometry_key is not None and geometry_key in node:
+            result[geometry_key] = node[geometry_key]
+    return result
 
 
 def _empty_geometry_shape(value: Any) -> Any:

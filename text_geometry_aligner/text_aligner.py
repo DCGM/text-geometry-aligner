@@ -6,7 +6,7 @@ from __future__ import annotations
 import argparse
 import logging
 from pathlib import Path
-from typing import Any
+from typing import Any, Sequence
 
 import text_geometry_aligner.base_aligner as base_aligner_module
 from text_geometry_aligner.io_alto import ALTOPage, ALTOReader
@@ -30,6 +30,7 @@ from text_geometry_aligner.models import (
     AlignmentDocument,
     AlignmentMode,
     AlignmentPage,
+    AlignmentRegion,
     AlignmentWord,
     InputFormat,
     OutputGeometryFormat,
@@ -47,6 +48,7 @@ from text_geometry_aligner.text_building import (
 )
 from text_geometry_aligner.text_matching import (
     ALTOTextIndex,
+    AlignmentCandidate,
     CER_SCALE,
     SIMILARITY_SCALE,
 )
@@ -67,6 +69,9 @@ from text_geometry_aligner.text_matching.candidate_selectors import (
 from text_geometry_aligner.text_matching.diagnostics import (
     _find_ambiguous_region_ids,
     _find_conflicted_region_ids,
+)
+from text_geometry_aligner.text_matching.sibling_proximity import (
+    refine_by_sibling_proximity,
 )
 from text_geometry_aligner.utils import _parse_logging_level
 
@@ -98,6 +103,10 @@ class TextAligner(BaseAligner):
         overwrite_existing_geometry: bool = False,
         output_text_source: OutputTextSource | str = OutputTextSource.JSON,
         label_mapper: LabelMapper | None = None,
+        skip_keys: Sequence[str] = (),
+        min_similarity: float = 0.0,
+        share_words_between_top_level_keys: bool = False,
+        prefer_sibling_proximity: bool = False,
     ):
         if geometry_suffix == "":
             raise ValueError("geometry_suffix must not be empty")
@@ -106,6 +115,13 @@ class TextAligner(BaseAligner):
                 "label_mapper cannot be combined with a custom json_reader; "
                 "configure the reader with the mapper instead"
             )
+        if skip_keys and json_reader is not None:
+            raise ValueError(
+                "skip_keys cannot be combined with a custom json_reader; "
+                "configure the reader with the keys instead"
+            )
+        if not 0.0 <= min_similarity <= 1.0:
+            raise ValueError("min_similarity must be within [0, 1]")
         parsed_output_geometry_format = OutputGeometryFormat(
             output_geometry_format
         )
@@ -136,10 +152,16 @@ class TextAligner(BaseAligner):
         )
         self.candidate_generator = candidate_generator
         self.candidate_selector = candidate_selector
+        self.min_similarity = min_similarity
+        self.share_words_between_top_level_keys = (
+            share_words_between_top_level_keys
+        )
+        self.prefer_sibling_proximity = prefer_sibling_proximity
         self.json_reader = json_reader or JSONTextReader(
             geometry_suffix=self.geometry_suffix,
             overwrite_existing_geometry=overwrite_existing_geometry,
             label_mapper=label_mapper,
+            skip_keys=skip_keys,
         )
 
     @property
@@ -197,16 +219,42 @@ class TextAligner(BaseAligner):
             page.regions,
             alto_index,
         )
+        if self.min_similarity > 0.0:
+            # A short value within the edit-distance limit can still be a
+            # different word ("I" -> "IV."); such candidates never compete.
+            minimum_similarity_int = round(
+                self.min_similarity * SIMILARITY_SCALE
+            )
+            candidates = tuple(
+                candidate
+                for candidate in candidates
+                if candidate.similarity_int >= minimum_similarity_int
+            )
         ambiguous_region_ids = _find_ambiguous_region_ids(candidates)
-        selected_candidates = self.candidate_selector.select(
-            candidates,
+        selected_candidates: list[AlignmentCandidate] = []
+        conflicted_region_ids: list[int] = []
+        for partition_regions, partition_candidates in self._word_partitions(
             page.regions,
-        )
-        conflicted_region_ids = _find_conflicted_region_ids(
             candidates,
-            selected_candidates,
-            page.regions,
-        )
+        ):
+            partition_selected = self.candidate_selector.select(
+                partition_candidates,
+                partition_regions,
+            )
+            if self.prefer_sibling_proximity:
+                partition_selected = refine_by_sibling_proximity(
+                    partition_candidates,
+                    partition_selected,
+                    alto_page.words,
+                )
+            selected_candidates.extend(partition_selected)
+            conflicted_region_ids.extend(
+                _find_conflicted_region_ids(
+                    partition_candidates,
+                    partition_selected,
+                    partition_regions,
+                )
+            )
         selected_by_region = {
             candidate.region_id: candidate
             for candidate in selected_candidates
@@ -289,6 +337,41 @@ class TextAligner(BaseAligner):
         )
         return page
 
+    def _word_partitions(
+        self,
+        regions: Sequence[AlignmentRegion],
+        candidates: Sequence[AlignmentCandidate],
+    ) -> list[tuple[list[AlignmentRegion], list[AlignmentCandidate]]]:
+        """Groups of regions that compete for ALTO words, with their candidates.
+
+        Every region competes with every other one unless words may be shared
+        between top-level keys; then only regions under the same top-level key
+        compete, so an agent's name can also be part of a statement of
+        responsibility.
+        """
+
+        if not self.share_words_between_top_level_keys:
+            return [(list(regions), list(candidates))]
+
+        def key(path: Any) -> Any:
+            return path[0] if path else None
+
+        partitions: dict[
+            Any,
+            tuple[list[AlignmentRegion], list[AlignmentCandidate]],
+        ] = {}
+        for region in regions:
+            partitions.setdefault(
+                key(region.json_text_path),
+                ([], []),
+            )[0].append(region)
+        for candidate in candidates:
+            partitions.setdefault(
+                key(candidate.json_text_path),
+                ([], []),
+            )[1].append(candidate)
+        return list(partitions.values())
+
 def build_argument_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
@@ -365,6 +448,31 @@ def build_argument_parser() -> argparse.ArgumentParser:
         help="Replace existing selected-format geometry",
     )
     parser.add_argument(
+        "--skip-key",
+        action="append",
+        default=None,
+        help="JSON key whose values (nested ones too) are not aligned; repeat "
+        "for more keys",
+    )
+    parser.add_argument(
+        "--min-similarity",
+        type=float,
+        default=0.0,
+        help="Discard candidates below this similarity (default: 0)",
+    )
+    parser.add_argument(
+        "--share-words-between-top-level-keys",
+        action="store_true",
+        help="Let values under different top-level JSON keys match the same "
+        "ALTO words",
+    )
+    parser.add_argument(
+        "--prefer-sibling-proximity",
+        action="store_true",
+        help="Among equally good matches take the one nearest to the other "
+        "values of the same JSON object",
+    )
+    parser.add_argument(
         "--logging-level",
         type=_parse_logging_level,
         default=logging.INFO,
@@ -431,6 +539,8 @@ def main() -> None:
         normalizer = TextNormalizationPipeline.from_optional_names(
             args.text_normalizer
         )
+        if not 0.0 <= args.min_similarity <= 1.0:
+            raise ValueError("--min-similarity must be within [0, 1]")
         candidate_generator = _build_candidate_generator(args)
         candidate_selector = _build_candidate_selector(args)
         label_mapper = (
@@ -464,9 +574,16 @@ def main() -> None:
             args.output_alto_text_format
         ),
         json_writer=json_writer,
+        renderer=base_aligner_module._build_renderer(args),
         overwrite_existing_geometry=args.overwrite_existing_geometry,
         output_text_source=args.output_text_source,
         label_mapper=label_mapper,
+        skip_keys=args.skip_key or (),
+        min_similarity=args.min_similarity,
+        share_words_between_top_level_keys=(
+            args.share_words_between_top_level_keys
+        ),
+        prefer_sibling_proximity=args.prefer_sibling_proximity,
     )
     aligner.process_directories(
         alto_input_dir=args.alto_dir,

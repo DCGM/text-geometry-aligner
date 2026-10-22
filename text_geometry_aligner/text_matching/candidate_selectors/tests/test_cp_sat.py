@@ -99,6 +99,29 @@ def test_equal_matches_prefer_earlier_alto_start_independently_of_id(
     assert selected[0].candidate_id == 1
 
 
+def test_equal_matches_prefer_fewer_words_over_earlier_start(
+    lowercase_normalizer,
+) -> None:
+    values = (_value(0, "Rome"),)
+    (exact,) = alignment.ExactTextCandidateGenerator().generate(
+        values,
+        alignment.ALTOTextIndex(
+            _page("1934.", "Rome"),
+            lowercase_normalizer,
+        ),
+    )
+    # The same quality with a stray word in front, as a fuzzy span can have.
+    padded = replace(exact, candidate_id=1, start_word=0, exact=False)
+    candidates = (replace(exact, exact=False), padded)
+
+    selected = alignment.CPSATCandidateSelector().select(
+        candidates,
+        values,
+    )
+
+    assert [(c.start_word, c.end_word) for c in selected] == [(1, 1)]
+
+
 def test_long_near_exact_phrase_beats_short_exact_substring(
     lowercase_normalizer,
 ) -> None:

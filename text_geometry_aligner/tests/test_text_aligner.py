@@ -487,3 +487,139 @@ def test_text_aligner_passes_mapper_to_default_reader() -> None:
     )
 
     assert aligner.json_reader.label_mapper is mapper
+
+
+def _cp_sat_aligner(lowercase_normalizer, **options) -> alignment.TextAligner:
+    return alignment.TextAligner(
+        candidate_generator=alignment.ExactTextCandidateGenerator(),
+        candidate_selector=alignment.CPSATCandidateSelector(),
+        normalizer=lowercase_normalizer,
+        **options,
+    )
+
+
+def test_top_level_keys_can_share_words(
+    lowercase_normalizer, alignment_output
+) -> None:
+    data = {"statement": ["by Jan Novak"], "agents": [{"name": "Jan Novak"}]}
+    page = _page("by", "Jan", "Novak")
+
+    exclusive = _cp_sat_aligner(lowercase_normalizer)
+    shared = _cp_sat_aligner(
+        lowercase_normalizer,
+        share_words_between_top_level_keys=True,
+    )
+    exclusive_output = alignment_output(exclusive, exclusive.align_data(page, data))
+    shared_output = alignment_output(shared, shared.align_data(page, data))
+
+    assert exclusive_output["statement_bbox"][0] is not None
+    assert exclusive_output["agents"][0]["name_bbox"] is None
+    assert shared_output["statement_bbox"][0] is not None
+    assert shared_output["agents"][0]["name_bbox"] == {
+        "x": 10,
+        "y": 0,
+        "width": 19,
+        "height": 10,
+    }
+
+
+def test_sibling_proximity_picks_the_repeat_next_to_its_siblings(
+    lowercase_normalizer, alignment_output
+) -> None:
+    data = {"publication": [{"placeTerm": "Praha", "publisher": "Otto"}]}
+    page = _page("Praha", "a", "b", "c", "d", "Otto", "Praha")
+
+    earliest = _cp_sat_aligner(lowercase_normalizer)
+    nearest = _cp_sat_aligner(lowercase_normalizer, prefer_sibling_proximity=True)
+    earliest_output = alignment_output(earliest, earliest.align_data(page, data))
+    nearest_output = alignment_output(nearest, nearest.align_data(page, data))
+
+    assert earliest_output["publication"][0]["placeTerm_bbox"]["x"] == 0
+    assert nearest_output["publication"][0]["placeTerm_bbox"]["x"] == 60
+    assert nearest_output["publication"][0]["publisher_bbox"]["x"] == 50
+
+
+def test_min_similarity_rejects_a_different_short_word(
+    lowercase_normalizer, alignment_output
+) -> None:
+    def aligner(**options):
+        return alignment.TextAligner(
+            candidate_generator=aligner_module._build_candidate_generator(
+                aligner_module.build_argument_parser().parse_args(
+                    ["--alto-dir", "a", "--input-dir", "j", "--json-output-dir", "o"]
+                )
+            ),
+            candidate_selector=alignment.CPSATCandidateSelector(),
+            normalizer=lowercase_normalizer,
+            **options,
+        )
+
+    data = {"partNumber": "I"}
+    page = _page("IV")
+    loose, strict = aligner(), aligner(min_similarity=0.5)
+
+    assert alignment_output(loose, loose.align_data(page, data))["partNumber_bbox"]
+    assert (
+        alignment_output(strict, strict.align_data(page, data))["partNumber_bbox"]
+        is None
+    )
+
+
+def test_text_aligner_validates_new_options() -> None:
+    with pytest.raises(ValueError, match="min_similarity"):
+        alignment.TextAligner(
+            candidate_generator=alignment.ExactTextCandidateGenerator(),
+            candidate_selector=alignment.PassThroughCandidateSelector(),
+            min_similarity=1.5,
+        )
+    with pytest.raises(ValueError, match="custom json_reader"):
+        alignment.TextAligner(
+            candidate_generator=alignment.ExactTextCandidateGenerator(),
+            candidate_selector=alignment.PassThroughCandidateSelector(),
+            json_reader=alignment.JSONTextReader(),
+            skip_keys=("lang",),
+        )
+
+
+def test_new_cli_options_reach_the_aligner_and_renderer() -> None:
+    parser = aligner_module.build_argument_parser()
+    required_arguments = [
+        "--alto-dir",
+        "alto",
+        "--input-dir",
+        "json",
+        "--json-output-dir",
+        "output",
+    ]
+    default_args = parser.parse_args(required_arguments)
+    args = parser.parse_args(
+        [
+            *required_arguments,
+            "--skip-key",
+            "lang",
+            "--skip-key",
+            "role",
+            "--min-similarity",
+            "0.5",
+            "--share-words-between-top-level-keys",
+            "--prefer-sibling-proximity",
+            "--render-font-size",
+            "22",
+            "--render-field-names",
+        ]
+    )
+
+    assert default_args.skip_key is None
+    assert default_args.min_similarity == 0.0
+    assert not default_args.share_words_between_top_level_keys
+    assert not default_args.prefer_sibling_proximity
+    assert default_args.render_font_size == 36
+    assert not default_args.render_field_names
+    assert args.skip_key == ["lang", "role"]
+    assert args.min_similarity == 0.5
+    assert args.share_words_between_top_level_keys
+    assert args.prefer_sibling_proximity
+
+    renderer = base_aligner_module._build_renderer(args)
+    assert renderer.font_size == 22
+    assert renderer.show_field_names

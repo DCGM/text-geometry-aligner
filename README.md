@@ -159,7 +159,8 @@ An unmatched value receives `null` geometry. String, integer, and float values
 are alignable; booleans and existing geometry keys are ignored. Nested
 dictionaries and lists are retained through their JSON paths. Scalar list
 values must ultimately be owned by a dictionary key so that a parallel
-geometry key can be created.
+geometry key can be created. Each geometry key is written right after its
+value key.
 
 ### Geometry alignment: geometry in, text out
 
@@ -437,6 +438,10 @@ Important options:
 | `--output-text-source` | `json` | Retain `json` text or use matched `alto` text |
 | `--text-normalizer` | none | Add comparison normalization; repeat to compose transformations |
 | `--overwrite-existing-geometry` | off | Replace existing geometry destinations |
+| `--skip-key` | none | Do not align values under this key, at any depth; repeat for more keys |
+| `--min-similarity` | `0` | Discard candidates below this similarity |
+| `--share-words-between-top-level-keys` | off | Let values under different top-level keys match the same ALTO words |
+| `--prefer-sibling-proximity` | off | Among equally good matches take the one nearest to the value's siblings |
 
 Available optional text normalizers are `lowercase`, `strip-diacritics`, and
 `strip-punctuation`. Unicode normalization and whitespace normalization are
@@ -452,9 +457,35 @@ selected candidate, and independently normalized ALTO tokens for inspection.
 These inspection fields are not added to exported JSON.
 
 CP-SAT first maximizes match quality, exact-match count, and matched-value
-count. If complete solutions remain equal, it prefers candidates whose
-`start_word` positions are closer to the beginning of the ALTO document, then
-uses candidate IDs as a deterministic final fallback.
+count. If complete solutions remain equal, it prefers fewer matched ALTO
+words, so a fuzzy span with a stray word at its edge ("1934. RSKÉHO" for
+"PROFESORSKÉHO") loses to the equally good span without it. It then prefers
+candidates whose `start_word` positions are closer to the beginning of the
+ALTO document, and uses candidate IDs as a deterministic final fallback.
+
+Every ALTO word belongs to at most one value. Metadata often repeats page
+text on purpose: an agent's name is also part of its statement of
+responsibility, and a firm can be both publisher and printer. With
+`--share-words-between-top-level-keys`, values compete for words only with
+values under the same top-level key, so `agents[0].name` and
+`statementOfResponsibility[0]` can both match the same words, while a title
+and a subtitle under `titleInfo` still cannot. Do not use it for flat JSON,
+where every value is its own top-level key and nothing would compete.
+
+The earliest-position tie-break picks the first occurrence of a value printed
+more than once, such as a place or a year. `--prefer-sibling-proximity` moves
+each such value, after selection, to its equally good match nearest to its
+siblings: the other matched values sharing the longest JSON object path with
+it, at least one object deep (the place, publisher, and date of
+`publication[0]`). A move never lowers match quality and never takes a word
+from another value; values without siblings keep their match.
+
+`--min-similarity` drops candidates before selection. The edit-distance rule
+for short values accepts one edit, which for a one-letter value matches a
+different word ("I" for "IV."); `0.5` rejects such matches.
+
+`--skip-key` keeps values that are not transcriptions, such as language codes
+or roles, out of matching; they get no geometry key.
 
 Fuzzy acceptance defaults:
 
@@ -518,7 +549,10 @@ provided:
 Images are paired by filename stem. Text-alignment labels show match
 similarity; geometry-alignment labels show average overlap score. Geometry is
 scaled from ALTO page coordinates when the ALTO page dimensions differ from
-the source image dimensions.
+the source image dimensions. `--render-field-names` prefixes each label with
+its field (the dotted JSON keys, such as `publication.placeTerm`, or the
+label), and `--render-font-size` (default `36`) sets the label size; labels
+are drawn above their boxes, so a smaller font covers less of crowded pages.
 
 By default, an input without matching ALTO is logged and skipped. Add
 `--fail-on-missing-alto` to stop with an error instead.

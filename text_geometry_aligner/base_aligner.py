@@ -63,6 +63,13 @@ def _build_text_builder(output_format: str) -> TextBuilder:
     )
 
 
+def _build_renderer(args: argparse.Namespace) -> AlignmentRenderer:
+    return PillowAlignmentRenderer(
+        font_size=args.render_font_size,
+        show_field_names=args.render_field_names,
+    )
+
+
 def _build_geometry_builder(
     output_format: OutputGeometryFormat,
 ) -> GeometryBuilder:
@@ -460,6 +467,17 @@ def add_common_cli_arguments(
         help="Optional directory for rendered alignment visualizations",
     )
     parser.add_argument(
+        "--render-font-size",
+        type=int,
+        default=36,
+        help="Label font size of the renders (default: 36)",
+    )
+    parser.add_argument(
+        "--render-field-names",
+        action="store_true",
+        help="Prefix render labels with the field name",
+    )
+    parser.add_argument(
         "--fail-on-missing-alto",
         action="store_true",
         help="Fail instead of skipping an input page without ALTO",
@@ -472,6 +490,8 @@ def validate_common_cli_arguments(
 ) -> None:
     if (args.images_dir is None) != (args.render_dir is None):
         parser.error("--images-dir and --render-dir must be provided together")
+    if args.render_font_size <= 0:
+        parser.error("--render-font-size must be positive")
     if (
         args.output_json_format == "label-studio"
         and (

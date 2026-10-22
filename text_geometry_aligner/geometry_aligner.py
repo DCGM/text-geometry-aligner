@@ -374,6 +374,7 @@ def main() -> None:
                 OutputGeometryFormat(args.output_alto_geometry_format)
             ),
             json_writer=json_writer,
+            renderer=base_aligner_module._build_renderer(args),
             label_mapper=label_mapper,
         )
     except (OSError, TypeError, ValueError) as exc:
