@@ -107,6 +107,8 @@ class TextAligner(BaseAligner):
         min_similarity: float = 0.0,
         share_words_between_top_level_keys: bool = False,
         prefer_sibling_proximity: bool = False,
+        share_words_depth: int | None = None,
+        share_words_keys: Sequence[str] = (),
     ):
         if geometry_suffix == "":
             raise ValueError("geometry_suffix must not be empty")
@@ -122,6 +124,16 @@ class TextAligner(BaseAligner):
             )
         if not 0.0 <= min_similarity <= 1.0:
             raise ValueError("min_similarity must be within [0, 1]")
+        if share_words_depth is not None and share_words_depth < 1:
+            raise ValueError("share_words_depth must be at least 1")
+        if (
+            share_words_between_top_level_keys
+            and share_words_depth not in (None, 1)
+        ):
+            raise ValueError(
+                "share_words_between_top_level_keys is share_words_depth=1; "
+                "do not combine it with another depth"
+            )
         parsed_output_geometry_format = OutputGeometryFormat(
             output_geometry_format
         )
@@ -156,6 +168,10 @@ class TextAligner(BaseAligner):
         self.share_words_between_top_level_keys = (
             share_words_between_top_level_keys
         )
+        self.share_words_depth = (
+            1 if share_words_between_top_level_keys else share_words_depth
+        )
+        self.share_words_keys = frozenset(share_words_keys)
         self.prefer_sibling_proximity = prefer_sibling_proximity
         self.json_reader = json_reader or JSONTextReader(
             geometry_suffix=self.geometry_suffix,
@@ -344,17 +360,34 @@ class TextAligner(BaseAligner):
     ) -> list[tuple[list[AlignmentRegion], list[AlignmentCandidate]]]:
         """Groups of regions that compete for ALTO words, with their candidates.
 
-        Every region competes with every other one unless words may be shared
-        between top-level keys; then only regions under the same top-level key
-        compete, so an agent's name can also be part of a statement of
-        responsibility.
+        Every region competes with every other one by default. With a share
+        depth N, only regions whose JSON paths agree on their first N
+        components (keys and list indices) compete: depth 1 lets values under
+        different top-level keys share words (an agent's name inside its
+        statement of responsibility), depth 2 on {"items": [...]} makes every
+        list element its own group. Regions under a share key (at any depth)
+        form a group of their own within their partition, so a whole statement
+        can share words with the values that split it.
         """
 
-        if not self.share_words_between_top_level_keys:
+        if self.share_words_depth is None and not self.share_words_keys:
             return [(list(regions), list(candidates))]
 
         def key(path: Any) -> Any:
-            return path[0] if path else None
+            parts = tuple(path or ())
+            depth = self.share_words_depth
+            group = parts[:depth] if depth else ()
+            shared = next(
+                (
+                    part
+                    for part in parts
+                    if isinstance(part, str) and part in self.share_words_keys
+                ),
+                None,
+            )
+            if shared is None:
+                return group
+            return (*group, ("share-key", shared))
 
         partitions: dict[
             Any,
@@ -464,7 +497,22 @@ def build_argument_parser() -> argparse.ArgumentParser:
         "--share-words-between-top-level-keys",
         action="store_true",
         help="Let values under different top-level JSON keys match the same "
-        "ALTO words",
+        "ALTO words (the same as --share-words-depth 1)",
+    )
+    parser.add_argument(
+        "--share-words-depth",
+        type=int,
+        default=None,
+        help="Values compete for ALTO words only when their JSON paths agree "
+        "on this many first components (keys and list indices); 2 makes each "
+        "element of a top-level list its own group",
+    )
+    parser.add_argument(
+        "--share-words-key",
+        action="append",
+        default=None,
+        help="JSON key whose values (nested ones too) form their own group, so "
+        "they may match the words of the other values; repeat for more keys",
     )
     parser.add_argument(
         "--prefer-sibling-proximity",
@@ -583,6 +631,8 @@ def main() -> None:
         share_words_between_top_level_keys=(
             args.share_words_between_top_level_keys
         ),
+        share_words_depth=args.share_words_depth,
+        share_words_keys=args.share_words_key or (),
         prefer_sibling_proximity=args.prefer_sibling_proximity,
     )
     aligner.process_directories(

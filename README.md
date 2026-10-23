@@ -440,7 +440,9 @@ Important options:
 | `--overwrite-existing-geometry` | off | Replace existing geometry destinations |
 | `--skip-key` | none | Do not align values under this key, at any depth; repeat for more keys |
 | `--min-similarity` | `0` | Discard candidates below this similarity |
-| `--share-words-between-top-level-keys` | off | Let values under different top-level keys match the same ALTO words |
+| `--share-words-between-top-level-keys` | off | Let values under different top-level keys match the same ALTO words (`--share-words-depth 1`) |
+| `--share-words-depth` | none | Values compete for ALTO words only when their JSON paths agree on this many first components |
+| `--share-words-key` | none | Values under this key, at any depth, form their own group and may match other values' words; repeat for more keys |
 | `--prefer-sibling-proximity` | off | Among equally good matches take the one nearest to the value's siblings |
 
 Available optional text normalizers are `lowercase`, `strip-diacritics`, and
@@ -471,6 +473,20 @@ values under the same top-level key, so `agents[0].name` and
 `statementOfResponsibility[0]` can both match the same words, while a title
 and a subtitle under `titleInfo` still cannot. Do not use it for flat JSON,
 where every value is its own top-level key and nothing would compete.
+
+`--share-words-depth N` generalizes this: values compete only when their JSON
+paths agree on the first N components, keys and list indices alike. Depth 1 is
+`--share-words-between-top-level-keys`. Depth 2 suits a page holding a list of
+records, such as `{"items": [...]}` with one item per article or entry: each
+element is its own group, so a value every item repeats from one printed line
+(a section heading, an issue date) is found for each item, while the values of
+one item still compete with each other.
+
+`--share-words-key KEY` puts the values under `KEY`, at any depth, into a group
+of their own within their partition. It is meant for a whole statement stored
+next to the fields that split it, such as a `citation` of a reviewed book
+beside the book's title, persons and imprint: both the statement and its parts
+get geometry. Values under the same share key still compete with each other.
 
 The earliest-position tie-break picks the first occurrence of a value printed
 more than once, such as a place or a year. `--prefer-sibling-proximity` moves

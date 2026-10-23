@@ -523,6 +523,71 @@ def test_top_level_keys_can_share_words(
     }
 
 
+def test_share_depth_two_makes_each_list_element_its_own_group(
+    lowercase_normalizer, alignment_output
+) -> None:
+    data = {
+        "items": [
+            {"section": "Recenze", "title": "Prvni"},
+            {"section": "Recenze", "title": "Druha"},
+        ]
+    }
+    page = _page("Recenze", "Prvni", "Druha")
+
+    top_level = _cp_sat_aligner(lowercase_normalizer, share_words_depth=1)
+    per_item = _cp_sat_aligner(lowercase_normalizer, share_words_depth=2)
+    top_level_output = alignment_output(top_level, top_level.align_data(page, data))
+    per_item_output = alignment_output(per_item, per_item.align_data(page, data))
+
+    top_level_sections = [item["section_bbox"] for item in top_level_output["items"]]
+    assert sum(box is not None for box in top_level_sections) == 1
+    assert [item["section_bbox"]["x"] for item in per_item_output["items"]] == [0, 0]
+    assert per_item_output["items"][1]["title_bbox"]["x"] == 20
+
+
+def test_share_key_lets_a_whole_statement_share_words_with_its_parts(
+    lowercase_normalizer, alignment_output
+) -> None:
+    data = {"works": [{"citation": "Jan Novak Kniha", "title": "Kniha"}]}
+    page = _page("Jan", "Novak", "Kniha")
+
+    exclusive = _cp_sat_aligner(lowercase_normalizer)
+    shared = _cp_sat_aligner(lowercase_normalizer, share_words_keys=["citation"])
+    exclusive_output = alignment_output(exclusive, exclusive.align_data(page, data))
+    shared_output = alignment_output(shared, shared.align_data(page, data))
+
+    exclusive_work = exclusive_output["works"][0]
+    assert (exclusive_work["citation_bbox"] is None) != (exclusive_work["title_bbox"] is None)
+    assert shared_output["works"][0]["citation_bbox"]["x"] == 0
+    assert shared_output["works"][0]["title_bbox"]["x"] == 20
+
+
+def test_share_words_between_top_level_keys_is_depth_one() -> None:
+    aligner = alignment.TextAligner(
+        candidate_generator=alignment.ExactTextCandidateGenerator(),
+        candidate_selector=alignment.PassThroughCandidateSelector(),
+        share_words_between_top_level_keys=True,
+    )
+
+    assert aligner.share_words_depth == 1
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        {"share_words_depth": 0},
+        {"share_words_between_top_level_keys": True, "share_words_depth": 2},
+    ],
+)
+def test_text_aligner_rejects_invalid_share_depth(options) -> None:
+    with pytest.raises(ValueError, match="share_words"):
+        alignment.TextAligner(
+            candidate_generator=alignment.ExactTextCandidateGenerator(),
+            candidate_selector=alignment.PassThroughCandidateSelector(),
+            **options,
+        )
+
+
 def test_sibling_proximity_picks_the_repeat_next_to_its_siblings(
     lowercase_normalizer, alignment_output
 ) -> None:
@@ -623,3 +688,32 @@ def test_new_cli_options_reach_the_aligner_and_renderer() -> None:
     renderer = base_aligner_module._build_renderer(args)
     assert renderer.font_size == 22
     assert renderer.show_field_names
+
+
+def test_share_words_cli_options() -> None:
+    parser = aligner_module.build_argument_parser()
+    required_arguments = [
+        "--alto-dir",
+        "alto",
+        "--input-dir",
+        "json",
+        "--json-output-dir",
+        "output",
+    ]
+    default_args = parser.parse_args(required_arguments)
+    args = parser.parse_args(
+        [
+            *required_arguments,
+            "--share-words-depth",
+            "2",
+            "--share-words-key",
+            "citation",
+            "--share-words-key",
+            "statement",
+        ]
+    )
+
+    assert default_args.share_words_depth is None
+    assert default_args.share_words_key is None
+    assert args.share_words_depth == 2
+    assert args.share_words_key == ["citation", "statement"]

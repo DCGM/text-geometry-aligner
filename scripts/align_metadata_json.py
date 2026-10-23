@@ -8,7 +8,10 @@ labelled "<field>: <value> [similarity]".
 
 This is the text aligner with the options the metadata needs:
 - values under different top-level keys may share words (an agent's name is part of its statement of
-  responsibility, a firm can be both publisher and printer);
+  responsibility, a firm can be both publisher and printer); --share-words-depth 2 for a page holding a list
+  of records ({"items": [...]}: each item its own group, so values every item repeats are found for each);
+- --share-words-key: values under the key (a whole statement such as a "citation") may share words with the
+  values that split it;
 - a value printed more than once takes the equally good match nearest to its siblings (the imprint's
   "V PRAZE", not the first one on the page);
 - coded values (--skip-key: language codes, roles, levels) get no bbox;
@@ -79,6 +82,11 @@ def main() -> None:
     parser.add_argument("--min-similarity", type=float, default=0.5,
                         help="matches below it get a null bbox (default: 0.5)")
     parser.add_argument("--font-size", type=int, default=22, help="label font size of the renders (default: 22)")
+    parser.add_argument("--share-words-depth", type=int, default=1,
+                        help="values compete for OCR words only when their JSON paths agree on this many first "
+                             "components (default: 1, the top-level keys; 2 for {\"items\": [...]})")
+    parser.add_argument("--share-words-key", action="append",
+                        help="key whose values form their own group (a whole statement beside its parts); repeat")
     args = parser.parse_args()
     if (args.images_dir is None) != (args.render_dir is None):
         parser.error("--images-dir and --render-dir must be given together")
@@ -94,7 +102,8 @@ def main() -> None:
         renderer=PillowAlignmentRenderer(font_size=args.font_size, show_field_names=True),
         skip_keys=args.skip_key or SKIP_KEYS,
         min_similarity=args.min_similarity,
-        share_words_between_top_level_keys=True,
+        share_words_depth=args.share_words_depth,
+        share_words_keys=args.share_words_key or (),
         prefer_sibling_proximity=True,
     )
     document = aligner.process_directories(
