@@ -430,7 +430,9 @@ Important options:
 
 | Option | Default | Description |
 | --- | --- | --- |
-| `--candidate-generator` | `combined` | Use `exact`, exact plus fuzzy (`combined`), or `ordered-alignment` matching |
+| `--candidate-generator` | `combined` | Use `exact`, exact plus fuzzy (`combined`), `ordered-alignment`, or `ordered-groups` matching |
+| `--ordered-group-depth` | `2` | For `ordered-groups`, JSON path depth defining each record; 2 groups elements of a top-level list |
+| `--ordered-group-columns` | off | For `ordered-groups`, conservatively restore clear two-column reading order |
 | `--candidate-selector` | `cp-sat` | Use global `cp-sat` selection or `pass-through` |
 | `--output-alto-text-format` | `space-separated` | Format used to build ALTO-derived text |
 | `--output-alto-geometry-format` | `bbox` | Build `bbox` or `polygon` ALTO geometry |
@@ -451,6 +453,45 @@ always applied. Repeated `--text-normalizer` arguments stack transformations
 in the order supplied. The `ordered-alignment` generator assumes JSON values
 are already in correct reading order and is normally paired with
 `--candidate-selector pass-through`.
+
+Use `--candidate-generator ordered-groups --ordered-group-depth 2` for data such
+as `{"entries": [{"title": "First", "page": "3"}, ...]}` when entries follow
+reading order but fields inside an entry do not. This mode chooses each group's
+longest field with a normal text candidate as its anchor, runs the existing fast
+ordered alignment on those anchors, and locates other fields independently near
+their own anchor. Text-match quality comes before geometric proximity. It also
+handles a separate OCR block for page numbers: whole entries need not occupy
+consecutive OCR intervals. A group whose anchor cannot be located stays unmatched.
+
+This is a simple mode for review hints. It keeps at most one candidate per field,
+so it can leave more fields unmatched than unrestricted matching. CP-SAT can
+still resolve word conflicts among the retained candidates. By default it uses
+existing OCR order. Original JSON values remain unchanged.
+
+Optionally add `--ordered-group-columns` to restore clear two-column reading order.
+The separate `ColumnReadingOrder` helper looks for a substantial gutter with
+parallel alphabetic text on both sides, excluding numeric/Roman locator columns.
+Within vertical bands separated by spanning headings, it reorders only when OCR
+jumps back from the right column to the left. Clear existing column order and
+ambiguous layouts are left alone. Detection is conservative and two-column only;
+complex layouts can still yield incorrect or missing hints. Keep this opt-in.
+This is for columns read consecutively, not paired translations or other
+row-corresponding columns (for example, German and Hungarian versions side by side).
+
+The helper uses a private, reindexed OCR view. Geometry, text, original ALTO IDs,
+and the on-disk ALTO stay unchanged. Candidate word indexes then refer to this
+internal reading order. For stitched images, use the API with explicit source-page
+regions, so page 2's left column cannot precede page 1's right column:
+
+```python
+order = ColumnReadingOrder(regions=[BoundingBox(0, 0, 1500, 2000),
+                                    BoundingBox(0, 2000, 1500, 2100)])
+generator = OrderedGroupsCandidateGenerator(field_generator, reading_order=order)
+```
+
+`order.detected_regions` reports gutters and whether each region was reordered.
+The CLI treats each ALTO Page as a single region; it cannot infer the original
+page boundaries of a stitched image.
 
 Normalization is visible in the returned alignment document without changing
 the original text. `input_text_normalized` is available even for unmatched

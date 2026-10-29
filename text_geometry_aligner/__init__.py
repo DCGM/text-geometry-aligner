@@ -72,12 +72,14 @@ from .text_matching.candidate_generators import (
     FuzzyCandidateConfig,
     OrderedAlignmentCandidateConfig,
     OrderedAlignmentCandidateGenerator,
+    OrderedGroupsCandidateGenerator,
 )
 from .text_matching.candidate_selectors import (
     CPSATCandidateSelector,
     CandidateSelector,
     PassThroughCandidateSelector,
 )
+from .text_matching.column_order import ColumnReadingOrder
 from .io_yolo import LabelDeduplicationGroup, YOLODetection, YOLOReader
 
 
@@ -143,6 +145,8 @@ __all__ = [
     "OutputTextSource",
     "OrderedAlignmentCandidateConfig",
     "OrderedAlignmentCandidateGenerator",
+    "OrderedGroupsCandidateGenerator",
+    "ColumnReadingOrder",
     "PassThroughCandidateSelector",
     "PillowAlignmentRenderer",
     "Point",

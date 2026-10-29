@@ -14,6 +14,7 @@ from .candidate_generators import (
     FuzzyCandidateConfig,
     OrderedAlignmentCandidateConfig,
     OrderedAlignmentCandidateGenerator,
+    OrderedGroupsCandidateGenerator,
 )
 from .candidate_selectors import (
     CPSATCandidateSelector,
@@ -28,5 +29,6 @@ __all__ = [
     "CPSATCandidateSelector", "ExactTextCandidateGenerator",
     "FuzzyCandidateConfig", "OrderedAlignmentCandidateConfig",
     "OrderedAlignmentCandidateGenerator", "PassThroughCandidateSelector",
+    "OrderedGroupsCandidateGenerator",
     "SIMILARITY_SCALE",
 ]

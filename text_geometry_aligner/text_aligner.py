@@ -60,6 +60,7 @@ from text_geometry_aligner.text_matching.candidate_generators import (
     FuzzyCandidateConfig,
     OrderedAlignmentCandidateConfig,
     OrderedAlignmentCandidateGenerator,
+    OrderedGroupsCandidateGenerator,
 )
 from text_geometry_aligner.text_matching.candidate_selectors import (
     CPSATCandidateSelector,
@@ -73,6 +74,7 @@ from text_geometry_aligner.text_matching.diagnostics import (
 from text_geometry_aligner.text_matching.sibling_proximity import (
     refine_by_sibling_proximity,
 )
+from text_geometry_aligner.text_matching.column_order import ColumnReadingOrder
 from text_geometry_aligner.utils import _parse_logging_level
 
 logger = logging.getLogger(__name__)
@@ -230,6 +232,9 @@ class TextAligner(BaseAligner):
                 else self.normalizer.normalize(str(region.input_text))
             )
 
+        prepare_page = getattr(self.candidate_generator, "prepare_page", None)
+        if prepare_page is not None:
+            alto_page = prepare_page(alto_page)
         alto_index = ALTOTextIndex(alto_page, self.normalizer)
         candidates = self.candidate_generator.generate(
             page.regions,
@@ -435,9 +440,18 @@ def build_argument_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--candidate-generator",
-        choices=("exact", "combined", "ordered-alignment"),
+        choices=("exact", "combined", "ordered-alignment", "ordered-groups"),
         default="combined",
         help="Candidate generation strategy (default: combined)",
+    )
+    parser.add_argument(
+        "--ordered-group-depth", type=int, default=2,
+        help="For ordered-groups: JSON path depth defining records (default: 2, "
+             "elements of a top-level list). Anchors follow record order; fields do not",
+    )
+    parser.add_argument(
+        "--ordered-group-columns", action="store_true",
+        help="For ordered-groups: conservatively restore two-column OCR order",
     )
     parser.add_argument(
         "--candidate-selector",
@@ -532,6 +546,8 @@ def build_argument_parser() -> argparse.ArgumentParser:
 def _build_candidate_generator(
     args: argparse.Namespace,
 ) -> CandidateGenerator:
+    if args.ordered_group_columns and args.candidate_generator != "ordered-groups":
+        raise ValueError("--ordered-group-columns requires --candidate-generator ordered-groups")
     if args.candidate_generator == "exact":
         return ExactTextCandidateGenerator()
     if args.candidate_generator == "ordered-alignment":
@@ -556,12 +572,20 @@ def _build_candidate_generator(
         ),
         max_candidates_per_value=args.fuzzy_max_candidates_per_value,
     )
-    return CompositeCandidateGenerator(
+    field_generator = CompositeCandidateGenerator(
         (
             ExactTextCandidateGenerator(),
             AnchoredFuzzyTextCandidateGenerator(fuzzy_config),
         )
     )
+    if args.candidate_generator == "ordered-groups":
+        return OrderedGroupsCandidateGenerator(field_generator, group_depth=args.ordered_group_depth,
+            reading_order=ColumnReadingOrder() if args.ordered_group_columns else None,
+            anchor_generator=OrderedAlignmentCandidateGenerator(OrderedAlignmentCandidateConfig(
+                query_length_boundary=args.fuzzy_query_length_boundary,
+                max_cer_at_or_above_boundary=args.fuzzy_max_cer_at_or_above_boundary,
+                max_edit_distance_below_boundary=args.fuzzy_max_edit_distance_below_boundary)))
+    return field_generator
 
 
 def _build_candidate_selector(

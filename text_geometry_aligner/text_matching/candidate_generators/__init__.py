@@ -11,6 +11,7 @@ from .ordered_alignment import (
     OrderedAlignmentCandidateConfig,
     OrderedAlignmentCandidateGenerator,
 )
+from .ordered_groups import OrderedGroupsCandidateGenerator
 
 __all__ = [
     "AnchoredFuzzyTextCandidateGenerator",
@@ -20,4 +21,5 @@ __all__ = [
     "FuzzyCandidateConfig",
     "OrderedAlignmentCandidateConfig",
     "OrderedAlignmentCandidateGenerator",
+    "OrderedGroupsCandidateGenerator",
 ]
