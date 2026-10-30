@@ -71,6 +71,10 @@ from text_geometry_aligner.text_matching.diagnostics import (
     _find_ambiguous_region_ids,
     _find_conflicted_region_ids,
 )
+from text_geometry_aligner.text_matching.identical_copies import (
+    CopyPathPattern,
+    copy_identical_matches,
+)
 from text_geometry_aligner.text_matching.sibling_proximity import (
     refine_by_sibling_proximity,
 )
@@ -111,6 +115,7 @@ class TextAligner(BaseAligner):
         prefer_sibling_proximity: bool = False,
         share_words_depth: int | None = None,
         share_words_keys: Sequence[str] = (),
+        copy_identical_paths: Sequence[str] = (),
     ):
         if geometry_suffix == "":
             raise ValueError("geometry_suffix must not be empty")
@@ -174,6 +179,9 @@ class TextAligner(BaseAligner):
             1 if share_words_between_top_level_keys else share_words_depth
         )
         self.share_words_keys = frozenset(share_words_keys)
+        self.copy_identical_paths = tuple(
+            CopyPathPattern.parse(pattern) for pattern in copy_identical_paths
+        )
         self.prefer_sibling_proximity = prefer_sibling_proximity
         self.json_reader = json_reader or JSONTextReader(
             geometry_suffix=self.geometry_suffix,
@@ -280,6 +288,17 @@ class TextAligner(BaseAligner):
             candidate.region_id: candidate
             for candidate in selected_candidates
         }
+        copied_from = {}
+        if self.copy_identical_paths:
+            for region_id, donor in copy_identical_matches(
+                page.regions,
+                selected_by_region,
+                self.copy_identical_paths,
+            ).items():
+                selected_by_region[region_id] = selected_by_region[
+                    donor.region_id
+                ]
+                copied_from[region_id] = donor.json_text_path
 
         for region in page.regions:
             candidate = selected_by_region.get(region.region_id)
@@ -293,6 +312,7 @@ class TextAligner(BaseAligner):
                 continue
 
             region.text_alignment_candidate = candidate
+            region.alignment_copied_from = copied_from.get(region.region_id)
             region.alto_text_normalized = (
                 alto_index.normalized_text_for_word_interval(
                     candidate.start_word,
@@ -335,7 +355,7 @@ class TextAligner(BaseAligner):
             )
             logger.info(
                 "Matched %s: %r -> words %d-%d (%r), source=%s, "
-                "edit_distance=%d, CER=%.4f",
+                "edit_distance=%d, CER=%.4f%s",
                 _format_json_path(region.json_text_path or ()),
                 region.input_text,
                 candidate.start_word,
@@ -344,6 +364,10 @@ class TextAligner(BaseAligner):
                 candidate.source,
                 candidate.edit_distance,
                 candidate.cer_int / CER_SCALE,
+                ""
+                if region.alignment_copied_from is None
+                else ", copied from "
+                + _format_json_path(region.alignment_copied_from),
             )
 
         logger.info(
@@ -529,6 +553,15 @@ def build_argument_parser() -> argparse.ArgumentParser:
         "they may match the words of the other values; repeat for more keys",
     )
     parser.add_argument(
+        "--copy-identical-path",
+        action="append",
+        default=None,
+        help="JSON path pattern (agents[*].description[*]; [i] binds an index "
+        "the donor shares) whose unmatched values take the match of an "
+        "exactly matched value with the same text under the pattern; repeat "
+        "for more patterns",
+    )
+    parser.add_argument(
         "--prefer-sibling-proximity",
         action="store_true",
         help="Among equally good matches take the one nearest to the other "
@@ -657,6 +690,7 @@ def main() -> None:
         ),
         share_words_depth=args.share_words_depth,
         share_words_keys=args.share_words_key or (),
+        copy_identical_paths=args.copy_identical_path or (),
         prefer_sibling_proximity=args.prefer_sibling_proximity,
     )
     aligner.process_directories(

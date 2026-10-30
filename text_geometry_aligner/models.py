@@ -188,6 +188,8 @@ class AlignmentRegion:
     json_text_path: JSONPath | None = None
     json_geometry_path: JSONPath | None = None
     alignment_score: float | None = None
+    # The path of the value whose match this one took (copy_identical_paths).
+    alignment_copied_from: JSONPath | None = None
 
     def __post_init__(self, label_mapper: LabelMapper | None) -> None:
         if label_mapper is not None:

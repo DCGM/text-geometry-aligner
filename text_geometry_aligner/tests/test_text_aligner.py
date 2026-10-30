@@ -562,6 +562,99 @@ def test_share_key_lets_a_whole_statement_share_words_with_its_parts(
     assert shared_output["works"][0]["title_bbox"]["x"] == 20
 
 
+def test_a_value_printed_once_for_several_takes_the_match_of_its_identical_value(
+    lowercase_normalizer, alignment_output
+) -> None:
+    data = {"agents": [{"name": "Jan", "description": ["professor"]},
+                       {"name": "Petr", "description": ["professor"]}]}
+    page = _page("Jan", "Petr", "professor")
+
+    plain = _cp_sat_aligner(lowercase_normalizer)
+    copying = _cp_sat_aligner(lowercase_normalizer, copy_identical_paths=["agents[*].description[*]"])
+    plain_output = alignment_output(plain, plain.align_data(page, data))
+    document = copying.align_data(page, data)
+    copying_output = alignment_output(copying, document)
+
+    assert [agent["description_bbox"][0] is None for agent in plain_output["agents"]] == [False, True]
+    assert [agent["description_bbox"][0]["x"] for agent in copying_output["agents"]] == [20, 20]
+    copied = [region.alignment_copied_from for region in document.pages[0].regions
+              if region.json_text_path == ("agents", 1, "description", 0)]
+    assert copied == [("agents", 0, "description", 0)]
+
+
+@pytest.mark.parametrize("pattern, copied", [
+    ("entries[i].descriptions[*]", False),
+    ("entries[*].descriptions[*]", True),
+    ("$.entries[*].descriptions[*]", True),
+    ("entries[*].titles[*]", False),
+])
+def test_a_bound_index_copies_only_within_its_list_element(
+    lowercase_normalizer, alignment_output, pattern, copied
+) -> None:
+    data = {"entries": [{"descriptions": ["prof"]}, {"descriptions": ["prof"]}]}
+    page = _page("prof")
+
+    aligner = _cp_sat_aligner(lowercase_normalizer, copy_identical_paths=[pattern])
+    output = alignment_output(aligner, aligner.align_data(page, data))
+
+    assert (output["entries"][1]["descriptions_bbox"][0] is not None) is copied
+
+
+def test_a_bound_index_copies_within_its_list_element(
+    lowercase_normalizer, alignment_output
+) -> None:
+    data = {"entries": [{"descriptions": ["prof", "prof"]}]}
+    page = _page("prof")
+
+    aligner = _cp_sat_aligner(lowercase_normalizer, copy_identical_paths=["entries[i].descriptions[*]"])
+    output = alignment_output(aligner, aligner.align_data(page, data))
+
+    assert [box["x"] for box in output["entries"][0]["descriptions_bbox"]] == [0, 0]
+
+
+def test_a_value_matched_approximately_keeps_its_own_match(
+    lowercase_normalizer, alignment_output
+) -> None:
+    data = {"agents": [{"description": ["professor"]}, {"description": ["professor"]}]}
+    page = _page("professor", "profesor")
+    aligner = alignment.TextAligner(
+        candidate_generator=alignment.CompositeCandidateGenerator((
+            alignment.ExactTextCandidateGenerator(),
+            alignment.AnchoredFuzzyTextCandidateGenerator(alignment.FuzzyCandidateConfig()),
+        )),
+        candidate_selector=alignment.CPSATCandidateSelector(),
+        normalizer=lowercase_normalizer,
+        copy_identical_paths=["agents[*].description[*]"],
+    )
+
+    output = alignment_output(aligner, aligner.align_data(page, data))
+
+    # Printed twice, once misread by the OCR.
+    assert sorted(agent["description_bbox"][0]["x"] for agent in output["agents"]) == [0, 10]
+
+
+def test_identical_values_matching_different_words_give_no_copy(
+    lowercase_normalizer, alignment_output
+) -> None:
+    data = {"agents": [{"description": ["prof"]}, {"description": ["prof"]}, {"description": ["prof"]}]}
+    page = _page("prof", "prof")
+
+    aligner = _cp_sat_aligner(lowercase_normalizer, copy_identical_paths=["agents[*].description[*]"])
+    output = alignment_output(aligner, aligner.align_data(page, data))
+
+    assert sum(agent["description_bbox"][0] is not None for agent in output["agents"]) == 2
+
+
+@pytest.mark.parametrize("pattern", ["", "agents..name", "agents[*", "agents[-1]", "[*]name"])
+def test_an_invalid_copy_path_pattern_is_rejected(pattern) -> None:
+    with pytest.raises(ValueError):
+        alignment.TextAligner(
+            candidate_generator=alignment.ExactTextCandidateGenerator(),
+            candidate_selector=alignment.PassThroughCandidateSelector(),
+            copy_identical_paths=[pattern],
+        )
+
+
 def test_share_words_between_top_level_keys_is_depth_one() -> None:
     aligner = alignment.TextAligner(
         candidate_generator=alignment.ExactTextCandidateGenerator(),

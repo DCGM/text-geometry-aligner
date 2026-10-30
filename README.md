@@ -444,6 +444,7 @@ Important options:
 | `--min-similarity` | `0` | Discard candidates below this similarity |
 | `--share-words-between-top-level-keys` | off | Let values under different top-level keys match the same ALTO words (`--share-words-depth 1`) |
 | `--share-words-depth` | none | Values compete for ALTO words only when their JSON paths agree on this many first components |
+| `--copy-identical-path` | none | JSON path pattern whose unmatched values take the match of an identical, exactly matched value under it; repeat for more |
 | `--share-words-key` | none | Values under this key, at any depth, form their own group and may match other values' words; repeat for more keys |
 | `--prefer-sibling-proximity` | off | Among equally good matches take the one nearest to the value's siblings |
 
@@ -528,6 +529,20 @@ of their own within their partition. It is meant for a whole statement stored
 next to the fields that split it, such as a `citation` of a reviewed book
 beside the book's title, persons and imprint: both the statement and its parts
 get geometry. Values under the same share key still compete with each other.
+
+`--copy-identical-path PATTERN` handles a text the input repeats on purpose
+within one group: a description printed once under several names, one person
+listed in two roles. Only one of the identical values gets the words; with the
+option, every value under `PATTERN` left unmatched takes the match of a value
+under the same pattern with the same normalized text and an exact match of its
+own. The pattern is a JSON path with list indices in brackets: `[*]` matches
+any index, `[0]` that index only, and a name such as `[i]` an index the two
+values share, so `entries[i].descriptions[*]` copies only within one entry
+while `agents[*].description[*]` copies between agents. A value matched
+approximately keeps its match, as the text may be printed twice and misread
+once; when the identical values match different words, nothing is copied. A
+copied region names its source in `alignment_copied_from`; the JSON output
+does not tell copies apart.
 
 The earliest-position tie-break picks the first occurrence of a value printed
 more than once, such as a place or a year. `--prefer-sibling-proximity` moves
