@@ -691,6 +691,27 @@ document = geometry_aligner.process_file(
 )
 ```
 
+### Align one input to several ALTO pages
+
+A text spread over several pages, such as a table of contents, is one input
+whose values may run over a page break. `align_pages()` aligns loaded JSON to
+the pages read as one text, in their order: each page is put in reading order
+on its own (`prepare_page` of the candidate generator), then the pages are
+stacked one below the other and aligned in one pass, so values compete for
+the words of all pages and a value printed across a page break matches the
+end of one page and the start of the next.
+
+```python
+from text_geometry_aligner import ALTOReader
+
+pages = [ALTOReader().read(path) for path in ("toc_001.xml", "toc_002.xml")]
+document = text_aligner.align_pages(pages, {"entries": entries})
+```
+
+Every matched word keeps its own page's coordinates and ALTO IDs and names
+that page in `page_index`. A region's `page_index` is the page of its first
+word, and its `alto_geometry` covers its words on that page only.
+
 ### Process explicit file collections
 
 `process_files()` pairs the supplied paths by `page_key`. The order of

@@ -165,6 +165,9 @@ class AlignmentWord:
     alto_word_id: str | None = None
     alto_line_id: str | None = None
     alto_block_id: str | None = None
+    # The page of the word when several pages are aligned at once
+    # (TextAligner.align_pages), as its position among them.
+    page_index: int | None = None
 
 
 @dataclass
@@ -190,6 +193,9 @@ class AlignmentRegion:
     alignment_score: float | None = None
     # The path of the value whose match this one took (copy_identical_paths).
     alignment_copied_from: JSONPath | None = None
+    # The page of the region's first word when several pages are aligned at
+    # once (TextAligner.align_pages); its geometry covers its words there.
+    page_index: int | None = None
 
     def __post_init__(self, label_mapper: LabelMapper | None) -> None:
         if label_mapper is not None:

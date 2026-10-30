@@ -4,12 +4,13 @@
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import logging
 from pathlib import Path
 from typing import Any, Sequence
 
 import text_geometry_aligner.base_aligner as base_aligner_module
-from text_geometry_aligner.io_alto import ALTOPage, ALTOReader
+from text_geometry_aligner.io_alto import ALTOPage, ALTOReader, ALTOWord
 from text_geometry_aligner.base_aligner import (
     AlignmentPageWriter,
     BaseAligner,
@@ -228,7 +229,92 @@ class TextAligner(BaseAligner):
             pages=[page],
         )
 
+    def align_pages(
+        self,
+        alto_pages: Sequence[ALTOPage],
+        input_data: Any,
+    ) -> AlignmentDocument:
+        """Align loaded JSON to several ALTO pages read as one text, in their order.
+
+        A multi-page input - a table of contents over several pages - is one
+        text whose values may run over a page break. Each page is prepared for
+        matching on its own (the candidate generator's reading order), then
+        the pages are stacked one below the other into one page and aligned
+        in one pass: values compete for the words of all pages, and a value
+        printed across a page break matches the end of one page and the start
+        of the next. Every matched word keeps its own page's coordinates and
+        ALTO IDs and names that page in `page_index`. A region's `page_index`
+        is the page of its first word, and its geometry covers its words on
+        that page only. Returns a one-page document without ALTO page data.
+        """
+
+        prepare_page = getattr(self.candidate_generator, "prepare_page", None)
+        prepared = [
+            alto_page if prepare_page is None else prepare_page(alto_page)
+            for alto_page in alto_pages
+        ]
+        words: list[ALTOWord] = []
+        origins: list[tuple[int, ALTOWord]] = []
+        top = 0.0
+        line_offset = block_offset = 0
+        for page_index, alto_page in enumerate(prepared):
+            for word in alto_page.words:
+                origins.append((page_index, word))
+                words.append(dataclasses.replace(
+                    word,
+                    index=len(words),
+                    bbox=dataclasses.replace(word.bbox, y=word.bbox.y + top),
+                    line_index=None if word.line_index is None else word.line_index + line_offset,
+                    block_index=None if word.block_index is None else word.block_index + block_offset,
+                ))
+            top += alto_page.height or max((word.bbox.y_max for word in alto_page.words), default=0.0)
+            line_offset += 1 + max((word.line_index for word in alto_page.words
+                                    if word.line_index is not None), default=-1)
+            block_offset += 1 + max((word.block_index for word in alto_page.words
+                                     if word.block_index is not None), default=-1)
+        stacked = ALTOPage(
+            source_path=prepared[0].source_path if prepared else Path("."),
+            words=tuple(words),
+            width=max((alto_page.width or 0.0 for alto_page in prepared), default=None) or None,
+            height=top or None,
+        )
+
+        page = self.json_reader.from_data(input_data, page_key="page")
+        self._align_prepared_page(stacked, page)
+        for region in page.regions:
+            if not region.words:
+                continue
+            region.words = [
+                dataclasses.replace(
+                    word,
+                    word_index=origins[word.word_index][1].index,
+                    bbox=origins[word.word_index][1].bbox,
+                    page_index=origins[word.word_index][0],
+                )
+                for word in region.words
+            ]
+            region.page_index = region.words[0].page_index
+            region.alto_geometry = self.geometry_builder.build([
+                original
+                for page_index, original in (origins[index] for index in range(
+                    region.text_alignment_candidate.start_word,
+                    region.text_alignment_candidate.end_word + 1,
+                ))
+                if page_index == region.page_index
+            ])
+        return AlignmentDocument(alignment_mode=self.alignment_mode, pages=[page])
+
     def align_page(
+        self,
+        alto_page: ALTOPage,
+        page: AlignmentPage,
+    ) -> AlignmentPage:
+        prepare_page = getattr(self.candidate_generator, "prepare_page", None)
+        if prepare_page is not None:
+            alto_page = prepare_page(alto_page)
+        return self._align_prepared_page(alto_page, page)
+
+    def _align_prepared_page(
         self,
         alto_page: ALTOPage,
         page: AlignmentPage,
@@ -240,9 +326,6 @@ class TextAligner(BaseAligner):
                 else self.normalizer.normalize(str(region.input_text))
             )
 
-        prepare_page = getattr(self.candidate_generator, "prepare_page", None)
-        if prepare_page is not None:
-            alto_page = prepare_page(alto_page)
         alto_index = ALTOTextIndex(alto_page, self.normalizer)
         candidates = self.candidate_generator.generate(
             page.regions,

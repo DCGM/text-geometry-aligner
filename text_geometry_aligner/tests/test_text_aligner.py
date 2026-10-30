@@ -655,6 +655,41 @@ def test_an_invalid_copy_path_pattern_is_rejected(pattern) -> None:
         )
 
 
+def test_pages_aligned_at_once_compete_and_a_value_runs_over_the_page_break(
+    lowercase_normalizer,
+) -> None:
+    first = _page("Les", "a", "voda", "Jan")
+    second = _page("Novak", "Pole")
+    data = {"entries": [{"title": "Les a voda", "author": "Jan Novak"}, {"title": "Pole"}]}
+    aligner = _cp_sat_aligner(lowercase_normalizer)
+
+    document = aligner.align_pages([first, second], data)
+
+    regions = {region.json_text_path: region for region in document.pages[0].regions}
+    author = regions["entries", 0, "author"]
+    assert [(word.text, word.page_index, word.word_index) for word in author.words] == [
+        ("Jan", 0, 3), ("Novak", 1, 0)]
+    # Its geometry is its words on the page it starts on, in that page's coordinates.
+    assert author.page_index == 0 and author.alto_geometry.x == 30 and author.alto_geometry.width == 9
+    title = regions["entries", 1, "title"]
+    assert (title.page_index, title.words[0].bbox.y, title.alto_geometry.x) == (1, 0, 10)
+
+
+def test_pages_aligned_at_once_are_each_put_in_reading_order_on_their_own() -> None:
+    calls = []
+
+    class Recording(alignment.ExactTextCandidateGenerator):
+        def prepare_page(self, page):
+            calls.append(len(page.words))
+            return page
+
+    aligner = alignment.TextAligner(candidate_generator=Recording(),
+                                    candidate_selector=alignment.PassThroughCandidateSelector())
+    aligner.align_pages([_page("a", "b"), _page("c")], {"x": "c"})
+
+    assert calls == [2, 1]
+
+
 def test_share_words_between_top_level_keys_is_depth_one() -> None:
     aligner = alignment.TextAligner(
         candidate_generator=alignment.ExactTextCandidateGenerator(),
