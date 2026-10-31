@@ -694,26 +694,73 @@ def test_a_value_not_printed_inside_its_container_is_aligned_on_its_own(
     assert _regions_by_path(document)["agents", 0, "affiliation", 0].alignment_located_in is None
 
 
-def test_a_value_inside_its_container_finds_a_word_the_ocr_misread(
-    lowercase_normalizer, alignment_output
-) -> None:
-    data = {"agents": [{"description": ["profesor Komenskeho university"],
-                        "affiliation": ["Komenskeho university"]}]}
-    page = _page("profesor", "Komenskcho", "university")
-    aligner = alignment.TextAligner(
+def _fuzzy_aligner(lowercase_normalizer, **options) -> alignment.TextAligner:
+    return alignment.TextAligner(
         candidate_generator=alignment.CompositeCandidateGenerator((
             alignment.ExactTextCandidateGenerator(),
             alignment.AnchoredFuzzyTextCandidateGenerator(alignment.FuzzyCandidateConfig()),
         )),
         candidate_selector=alignment.CPSATCandidateSelector(),
         normalizer=lowercase_normalizer,
+        **options,
+    )
+
+
+@pytest.mark.parametrize("inside_location", ["json", "alto"])
+def test_a_value_inside_its_container_finds_a_word_the_ocr_misread(
+    lowercase_normalizer, alignment_output, inside_location
+) -> None:
+    data = {"agents": [{"description": ["profesor Komenskeho university"],
+                        "affiliation": ["Komenskeho university"]}]}
+    page = _page("profesor", "Komenskcho", "university")
+    aligner = _fuzzy_aligner(
+        lowercase_normalizer,
         inside_paths={"agents[i].affiliation[*]": "agents[i].description[*]"},
+        inside_location=inside_location,
     )
 
     agent = alignment_output(aligner, aligner.align_data(page, data))["agents"][0]
 
     assert agent["description_bbox"][0]["x"] == 0
     assert agent["affiliation_bbox"][0] == {"x": 10, "y": 0, "width": 19, "height": 10}
+
+
+@pytest.mark.parametrize(("inside_location", "word"), [("json", 4), ("alto", 0)])
+def test_a_value_inside_by_default_lands_where_its_container_prints_it(
+    lowercase_normalizer, inside_location, word
+) -> None:
+    data = {"agents": [{"description": ["Praga Society, profesor v Praha"], "affiliation": ["Praha"]}]}
+    page = _page("Praga", "Society,", "profesor", "v", "Prnna")
+    options = {} if inside_location == "json" else {"inside_location": inside_location}
+    aligner = _fuzzy_aligner(
+        lowercase_normalizer, inside_paths={"agents[i].affiliation[*]": "agents[i].description[*]"}, **options)
+
+    region = _regions_by_path(aligner.align_data(page, data))["agents", 0, "affiliation", 0]
+
+    assert [word.word_index for word in region.words] == [word]
+
+
+def test_values_inside_one_container_compete_for_its_words(lowercase_normalizer) -> None:
+    data = {"agents": [{"description": ["Praha a Praha"], "affiliation": ["Praha", "Praha"]}]}
+    aligner = _cp_sat_aligner(
+        lowercase_normalizer, inside_paths={"agents[i].affiliation[*]": "agents[i].description[*]"})
+
+    regions = _regions_by_path(aligner.align_data(_page("Praha", "a", "Praha"), data))
+
+    assert sorted(
+        [word.word_index for word in regions["agents", 0, "affiliation", number].words] for number in (0, 1)
+    ) == [[0], [2]]
+
+
+def test_a_value_inside_reads_its_container_text_on_words_the_ocr_ran_together(lowercase_normalizer) -> None:
+    data = {"agents": [{"description": ["profesor v Praze"], "affiliation": ["v Praze"]}]}
+    aligner = _fuzzy_aligner(
+        lowercase_normalizer, inside_paths={"agents[i].affiliation[*]": "agents[i].description[*]"})
+
+    region = _regions_by_path(aligner.align_data(_page("profesor", "vPraze"), data))["agents", 0, "affiliation", 0]
+
+    assert [word.word_index for word in region.words] == [1]
+    assert region.text_alignment_candidate.matched_text == "vPraze"
 
 
 def test_a_value_is_located_in_the_first_of_its_containers_that_holds_it(
@@ -800,12 +847,13 @@ def test_a_value_inside_by_words_is_not_part_of_a_word_of_its_container(
     assert _regions_by_path(document)["entries", 0, "partNumber"].alignment_located_in is None
 
 
-def test_inside_match_must_be_known() -> None:
-    with pytest.raises(ValueError, match="inside_match"):
+@pytest.mark.parametrize("option", ["inside_match", "inside_location"])
+def test_inside_options_must_be_known(option) -> None:
+    with pytest.raises(ValueError, match=option):
         alignment.TextAligner(
             candidate_generator=alignment.ExactTextCandidateGenerator(),
             candidate_selector=alignment.PassThroughCandidateSelector(),
-            inside_match="fuzzy",
+            **{option: "fuzzy"},
         )
 
 
@@ -1127,5 +1175,7 @@ def test_inside_path_cli_option_gives_the_containers_of_a_value_in_order() -> No
         "entries[i].agents[*]": ["entries[i].title", "entries[i].subTitle"]}
     assert args.inside_match == "exact"
     assert parser.parse_args([*required_arguments, "--inside-match", "words"]).inside_match == "words"
+    assert args.inside_location == "json"
+    assert parser.parse_args([*required_arguments, "--inside-location", "alto"]).inside_location == "alto"
     with pytest.raises(ValueError, match="VALUE=CONTAINER"):
         aligner_module._inside_paths(["entries[i].partNumber"])

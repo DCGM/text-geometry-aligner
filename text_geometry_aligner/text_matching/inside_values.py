@@ -6,12 +6,12 @@ import dataclasses
 import re
 from typing import Mapping, Sequence
 
+import Levenshtein
+
 from ..io_alto import ALTOPage
 from ..models import AlignmentRegion
-from ..normalization import TextNormalizer
 from .alto_text_index import ALTOTextIndex
 from .candidate import AlignmentCandidate
-from .candidate_generators.base import CandidateGenerator
 from .path_pattern import JSONPathPattern
 
 InsideRule = tuple[JSONPathPattern, tuple[JSONPathPattern, ...]]
@@ -21,6 +21,10 @@ InsideRule = tuple[JSONPathPattern, tuple[JSONPathPattern, ...]]
 # of the normalized text, "words" whole consecutive words of the normalized
 # text, punctuation aside.
 INSIDE_MATCHES = ("exact", "normalized", "words")
+
+# What the words a container matched read when its inside values are aligned
+# on them: "json" the container's text, "alto" their OCR text.
+INSIDE_LOCATIONS = ("json", "alto")
 
 
 def parse_inside_rules(inside_paths: Mapping[str, str | Sequence[str]]) -> tuple[InsideRule, ...]:
@@ -48,7 +52,7 @@ def inside_containers(
     it. A value under a rule's pattern whose text is in the text of a value
     under one of the rule's container patterns (as `match` tells), with the
     same bound indices, is left out of the alignment and located afterwards
-    within its container's words (locate_inside). The rule says a text was
+    on its container's words (container_page). The rule says a text was
     taken out of another one, so by default it must be a substring of it as
     given. The containers come in the order of their patterns, then of the
     input; the first rule a value matches decides.
@@ -80,59 +84,77 @@ def inside_containers(
     return by_region
 
 
-def locate_inside(
-    region: AlignmentRegion,
-    containers: Sequence[AlignmentRegion],
-    selected: Mapping[int, AlignmentCandidate],
+def container_page(
+    container: AlignmentRegion,
+    span: AlignmentCandidate,
     alto_page: ALTOPage,
     alto_index: ALTOTextIndex,
-    candidate_generator: CandidateGenerator,
-    normalizer: TextNormalizer,
-    minimum_similarity_int: int = 0,
-) -> tuple[AlignmentCandidate, AlignmentRegion] | None:
-    """The best match of `region` within the words of its first container that has one.
+    location: str = "json",
+) -> ALTOPage:
+    """The words `container` matched, as a page of their own to align its inside values on.
 
-    The candidate generator looks for the value among the container's
-    matched words only, so a word misread by the OCR is found as in the
-    alignment. A container without a match of its own gives nothing.
+    With `location` "alto" the words keep their OCR text. By default ("json")
+    each word reads the part of the container's normalized text aligned to
+    it by a character alignment of the container's text with the words'
+    text, so a value is aligned against the text the container gives rather
+    than against the OCR's reading of it. The words keep their boxes.
     """
 
-    for container in containers:
-        span = selected.get(container.region_id)
-        if span is None:
-            continue
-        words = alto_page.words[span.start_word:span.end_word + 1]
-        sub_page = ALTOPage(
-            source_path=alto_page.source_path,
-            words=tuple(dataclasses.replace(word, index=number) for number, word in enumerate(words)),
-        )
-        sub_index = ALTOTextIndex(sub_page, normalizer)
-        candidates = [
-            candidate
-            for candidate in candidate_generator.generate([region], sub_index)
-            if candidate.region_id == region.region_id
-            and candidate.similarity_int >= minimum_similarity_int
-        ]
-        if not candidates:
-            continue
-        best = max(candidates, key=lambda candidate: (
-            candidate.quality_chars, candidate.exact, candidate.similarity_int, -candidate.start_word))
-        # The container's words are joined into the same text in both indexes,
-        # so character offsets differ by where its first word starts.
-        full_spans = {word_span.word_index: word_span for word_span in alto_index.word_spans}
-        char_offset = next(
-            (full_spans[span.start_word + sub_span.word_index].char_start - sub_span.char_start
-             for sub_span in sub_index.word_spans),
-            0,
-        )
-        return dataclasses.replace(
-            best,
-            start_word=best.start_word + span.start_word,
-            end_word=best.end_word + span.start_word,
-            start_char=best.start_char + char_offset,
-            end_char=best.end_char + char_offset,
-        ), container
-    return None
+    if location not in INSIDE_LOCATIONS:
+        raise ValueError(f"inside location {location!r} is not one of {', '.join(INSIDE_LOCATIONS)}")
+    words = alto_page.words[span.start_word:span.end_word + 1]
+    texts = [word.text for word in words]
+    interval = alto_index.char_interval_for_word_interval(span.start_word, span.end_word)
+    if location == "json" and interval is not None:
+        container_text = container.input_text_normalized or ""
+        page_text = alto_index.normalized_text[interval[0]:interval[1]]
+        # The container character aligned to each character of the words'
+        # text; a word reads from its first character's up to the next word's,
+        # the first word from the start and the last one to the end, so every
+        # character of the container's text goes to one word.
+        to_container = [len(container_text)] * (len(page_text) + 1)
+        for tag, i1, i2, j1, j2 in Levenshtein.opcodes(container_text, page_text):
+            for j in range(j1, j2):
+                to_container[j] = i1 if tag == "insert" else i1 + (j - j1) * (i2 - i1) // (j2 - j1)
+        starts = {
+            word_span.word_index - span.start_word: word_span.char_start - interval[0]
+            for word_span in alto_index.word_spans
+            if span.start_word <= word_span.word_index <= span.end_word
+        }
+        bounds = sorted(starts.items())
+        texts = [""] * len(words)
+        for number, (word, char) in enumerate(bounds):
+            begin = 0 if number == 0 else to_container[char]
+            finish = to_container[bounds[number + 1][1]] if number + 1 < len(bounds) else len(container_text)
+            texts[word] = container_text[begin:finish].strip()
+    return ALTOPage(
+        source_path=alto_page.source_path,
+        words=tuple(
+            dataclasses.replace(word, index=number, text=text)
+            for number, (word, text) in enumerate(zip(words, texts))
+        ),
+    )
+
+
+def on_page(
+    candidate: AlignmentCandidate,
+    span: AlignmentCandidate,
+    alto_index: ALTOTextIndex,
+) -> AlignmentCandidate:
+    """A candidate on a container's page (container_page) as one on the whole page."""
+
+    start_word, end_word = candidate.start_word + span.start_word, candidate.end_word + span.start_word
+    start_char, end_char = alto_index.char_interval_for_word_interval(start_word, end_word) or (
+        candidate.start_char, candidate.end_char)
+    return dataclasses.replace(
+        candidate,
+        start_word=start_word,
+        end_word=end_word,
+        start_char=start_char,
+        end_char=end_char,
+        matched_text=alto_index.text_for_word_interval(start_word, end_word),
+        normalized_matched_text=alto_index.normalized_text_for_word_interval(start_word, end_word),
+    )
 
 
 def _agree(bound: tuple[tuple[str, int], ...], container_bound: tuple[tuple[str, int], ...] | None) -> bool:

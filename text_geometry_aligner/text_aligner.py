@@ -76,9 +76,11 @@ from text_geometry_aligner.text_matching.identical_copies import (
     copy_identical_matches,
 )
 from text_geometry_aligner.text_matching.inside_values import (
+    INSIDE_LOCATIONS,
     INSIDE_MATCHES,
+    container_page,
     inside_containers,
-    locate_inside,
+    on_page,
     parse_inside_rules,
 )
 from text_geometry_aligner.text_matching.path_pattern import JSONPathPattern
@@ -126,6 +128,7 @@ class TextAligner(BaseAligner):
         word_group_paths: Sequence[str] = (),
         inside_paths: Mapping[str, str | Sequence[str]] | None = None,
         inside_match: str = "exact",
+        inside_location: str = "json",
     ):
         if geometry_suffix == "":
             raise ValueError("geometry_suffix must not be empty")
@@ -144,6 +147,10 @@ class TextAligner(BaseAligner):
         if inside_match not in INSIDE_MATCHES:
             raise ValueError(
                 f"inside_match must be one of {', '.join(INSIDE_MATCHES)}"
+            )
+        if inside_location not in INSIDE_LOCATIONS:
+            raise ValueError(
+                f"inside_location must be one of {', '.join(INSIDE_LOCATIONS)}"
             )
         if share_words_depth is not None and share_words_depth < 1:
             raise ValueError("share_words_depth must be at least 1")
@@ -218,6 +225,7 @@ class TextAligner(BaseAligner):
         self.word_group_paths = parsed_word_group_paths
         self.inside_paths = parse_inside_rules(inside_paths or {})
         self.inside_match = inside_match
+        self.inside_location = inside_location
         self.prefer_sibling_proximity = prefer_sibling_proximity
         self.json_reader = json_reader or JSONTextReader(
             geometry_suffix=self.geometry_suffix,
@@ -372,64 +380,19 @@ class TextAligner(BaseAligner):
             if region.region_id not in inside
         ]
         alto_index = ALTOTextIndex(alto_page, self.normalizer)
-        candidates = self.candidate_generator.generate(
-            aligned_regions,
-            alto_index,
-        )
-        # A short value within the edit-distance limit can still be a
-        # different word ("I" -> "IV."); such candidates never compete.
-        minimum_similarity_int = round(self.min_similarity * SIMILARITY_SCALE)
-        if self.min_similarity > 0.0:
-            candidates = tuple(
-                candidate
-                for candidate in candidates
-                if candidate.similarity_int >= minimum_similarity_int
-            )
-        ambiguous_region_ids = _find_ambiguous_region_ids(candidates)
-        selected_candidates: list[AlignmentCandidate] = []
-        conflicted_region_ids: list[int] = []
-        for partition_regions, partition_candidates in self._word_partitions(
-            aligned_regions,
+        (
             candidates,
-        ):
-            partition_selected = self.candidate_selector.select(
-                partition_candidates,
-                partition_regions,
-            )
-            if self.prefer_sibling_proximity:
-                partition_selected = refine_by_sibling_proximity(
-                    partition_candidates,
-                    partition_selected,
-                    alto_page.words,
-                )
-            selected_candidates.extend(partition_selected)
-            conflicted_region_ids.extend(
-                _find_conflicted_region_ids(
-                    partition_candidates,
-                    partition_selected,
-                    partition_regions,
-                )
-            )
+            selected_candidates,
+            ambiguous_region_ids,
+            conflicted_region_ids,
+        ) = self._select(aligned_regions, alto_page, alto_index)
         selected_by_region = {
             candidate.region_id: candidate
             for candidate in selected_candidates
         }
-        located_in = {}
-        regions_by_id = {region.region_id: region for region in page.regions}
-        for region_id, containers in inside.items():
-            found = locate_inside(
-                regions_by_id[region_id],
-                containers,
-                selected_by_region,
-                alto_page,
-                alto_index,
-                self.candidate_generator,
-                self.normalizer,
-                minimum_similarity_int,
-            )
-            if found is not None:
-                selected_by_region[region_id] = found[0]
-                located_in[region_id] = found[1].json_text_path
+        located_in = self._align_inside(
+            page.regions, inside, selected_by_region, alto_page, alto_index
+        )
         copied_from = {}
         if self.copy_identical_paths:
             for region_id, donor in copy_identical_matches(
@@ -530,6 +493,120 @@ class TextAligner(BaseAligner):
             len(conflicted_region_ids),
         )
         return page
+
+    def _select(
+        self,
+        regions: Sequence[AlignmentRegion],
+        alto_page: ALTOPage,
+        alto_index: ALTOTextIndex,
+    ) -> tuple[
+        tuple[AlignmentCandidate, ...],
+        list[AlignmentCandidate],
+        list[int],
+        list[int],
+    ]:
+        """The candidates of `regions` on a page and those selected, with the
+        ids of the regions found ambiguous and in conflict."""
+
+        candidates = self.candidate_generator.generate(regions, alto_index)
+        # A short value within the edit-distance limit can still be a
+        # different word ("I" -> "IV."); such candidates never compete.
+        if self.min_similarity > 0.0:
+            minimum_similarity_int = round(
+                self.min_similarity * SIMILARITY_SCALE
+            )
+            candidates = tuple(
+                candidate
+                for candidate in candidates
+                if candidate.similarity_int >= minimum_similarity_int
+            )
+        ambiguous_region_ids = _find_ambiguous_region_ids(candidates)
+        selected_candidates: list[AlignmentCandidate] = []
+        conflicted_region_ids: list[int] = []
+        for partition_regions, partition_candidates in self._word_partitions(
+            regions,
+            candidates,
+        ):
+            partition_selected = self.candidate_selector.select(
+                partition_candidates,
+                partition_regions,
+            )
+            if self.prefer_sibling_proximity:
+                partition_selected = refine_by_sibling_proximity(
+                    partition_candidates,
+                    partition_selected,
+                    alto_page.words,
+                )
+            selected_candidates.extend(partition_selected)
+            conflicted_region_ids.extend(
+                _find_conflicted_region_ids(
+                    partition_candidates,
+                    partition_selected,
+                    partition_regions,
+                )
+            )
+        return (
+            tuple(candidates),
+            selected_candidates,
+            ambiguous_region_ids,
+            conflicted_region_ids,
+        )
+
+    def _align_inside(
+        self,
+        regions: Sequence[AlignmentRegion],
+        inside: Mapping[int, Sequence[AlignmentRegion]],
+        selected_by_region: dict[int, AlignmentCandidate],
+        alto_page: ALTOPage,
+        alto_index: ALTOTextIndex,
+    ) -> dict[int, JSONPath]:
+        """Align the values printed inside others on their containers' words.
+
+        The values of one container are aligned together as the page's
+        values are, on a page of the container's words (container_page). A
+        value takes its first container that has a match of its own; one not
+        found there tries its next container. Fills `selected_by_region` and
+        returns the container of each located value.
+        """
+
+        regions_by_id = {region.region_id: region for region in regions}
+        pending = {
+            region_id: [
+                container
+                for container in containers
+                if container.region_id in selected_by_region
+            ]
+            for region_id, containers in inside.items()
+        }
+        located_in: dict[int, JSONPath] = {}
+        while pending:
+            by_container: dict[int, list[AlignmentRegion]] = {}
+            for region_id, containers in list(pending.items()):
+                if not containers:
+                    del pending[region_id]
+                    continue
+                by_container.setdefault(containers[0].region_id, []).append(
+                    regions_by_id[region_id]
+                )
+            for container_id, values in by_container.items():
+                container = regions_by_id[container_id]
+                span = selected_by_region[container_id]
+                # The words come from the prepared page, in its order.
+                sub_page = container_page(
+                    container, span, alto_page, alto_index, self.inside_location
+                )
+                sub_index = ALTOTextIndex(sub_page, self.normalizer)
+                _, selected, _, _ = self._select(values, sub_page, sub_index)
+                for candidate in selected:
+                    selected_by_region[candidate.region_id] = on_page(
+                        candidate, span, alto_index
+                    )
+                    located_in[candidate.region_id] = container.json_text_path
+                    del pending[candidate.region_id]
+                for value in values:
+                    if value.region_id in pending:
+                        pending[value.region_id].pop(0)
+        return located_in
 
     def _word_partitions(
         self,
@@ -773,6 +850,14 @@ def build_argument_parser() -> argparse.ArgumentParser:
         "words of the normalized text, punctuation aside (words)",
     )
     parser.add_argument(
+        "--inside-location",
+        choices=INSIDE_LOCATIONS,
+        default="json",
+        help="what a container's words read when its --inside-path values "
+        "are aligned on them: the container's text aligned to them (json, "
+        "default) or their OCR text (alto)",
+    )
+    parser.add_argument(
         "--copy-identical-path",
         action="append",
         default=None,
@@ -914,6 +999,7 @@ def main() -> None:
         word_group_paths=args.word_group_path or (),
         inside_paths=_inside_paths(args.inside_path or ()),
         inside_match=args.inside_match,
+        inside_location=args.inside_location,
         prefer_sibling_proximity=args.prefer_sibling_proximity,
     )
     aligner.process_directories(
