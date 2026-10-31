@@ -763,6 +763,33 @@ def test_a_value_inside_reads_its_container_text_on_words_the_ocr_ran_together(l
     assert region.text_alignment_candidate.matched_text == "vPraze"
 
 
+@pytest.mark.parametrize("inside_location", ["json", "alto"])
+def test_values_inside_nest_to_any_depth(lowercase_normalizer, inside_location) -> None:
+    data = {"A": "a a b b b b c c", "B": "b b b b c c", "C": "c c", "D": "c"}
+    aligner = _cp_sat_aligner(
+        lowercase_normalizer, inside_paths={"B": "A", "C": "B", "D": "C"}, inside_location=inside_location)
+
+    regions = _regions_by_path(aligner.align_data(_page(*"a a b b b b c c".split()), data))
+
+    assert {path[0]: (region.alignment_located_in, [word.word_index for word in region.words])
+            for path, region in regions.items()} == {
+        "A": (None, list(range(8))),
+        "B": (("A",), [2, 3, 4, 5, 6, 7]),
+        "C": (("B",), [6, 7]),
+        "D": (("C",), [6]),
+    }
+
+
+def test_values_inside_each_other_stay_unmatched(lowercase_normalizer) -> None:
+    data = {"A": "a b", "B": "a b", "C": "x"}
+    aligner = _cp_sat_aligner(lowercase_normalizer, inside_paths={"A": "B", "B": "A"})
+
+    regions = _regions_by_path(aligner.align_data(_page("a", "b", "x"), data))
+
+    assert regions["A",].words is None and regions["B",].words is None
+    assert [word.word_index for word in regions["C",].words] == [2]
+
+
 def test_a_value_is_located_in_the_first_of_its_containers_that_holds_it(
     lowercase_normalizer, alignment_output
 ) -> None:

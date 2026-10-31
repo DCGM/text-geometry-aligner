@@ -565,29 +565,42 @@ class TextAligner(BaseAligner):
         The values of one container are aligned together as the page's
         values are, on a page of the container's words (container_page). A
         value takes its first container that has a match of its own; one not
-        found there tries its next container. Fills `selected_by_region` and
-        returns the container of each located value.
+        found there tries its next container. A container that is itself
+        inside another is waited for until it is located, so values nest to
+        any depth; values left waiting on each other stay unmatched. Fills
+        `selected_by_region` and returns the container of each located value.
         """
 
         regions_by_id = {region.region_id: region for region in regions}
         pending = {
-            region_id: [
-                container
-                for container in containers
-                if container.region_id in selected_by_region
-            ]
+            region_id: list(containers)
             for region_id, containers in inside.items()
         }
         located_in: dict[int, JSONPath] = {}
-        while pending:
+        while True:
+            # A container neither matched nor waiting to be located will not
+            # be found; dropping one can leave another value without any.
+            dropped = True
+            while dropped:
+                dropped = False
+                for region_id, containers in list(pending.items()):
+                    while (
+                        containers
+                        and containers[0].region_id not in selected_by_region
+                        and containers[0].region_id not in pending
+                    ):
+                        containers.pop(0)
+                    if not containers:
+                        del pending[region_id]
+                        dropped = True
             by_container: dict[int, list[AlignmentRegion]] = {}
-            for region_id, containers in list(pending.items()):
-                if not containers:
-                    del pending[region_id]
-                    continue
-                by_container.setdefault(containers[0].region_id, []).append(
-                    regions_by_id[region_id]
-                )
+            for region_id, containers in pending.items():
+                if containers[0].region_id in selected_by_region:
+                    by_container.setdefault(
+                        containers[0].region_id, []
+                    ).append(regions_by_id[region_id])
+            if not by_container:
+                break
             for container_id, values in by_container.items():
                 container = regions_by_id[container_id]
                 span = selected_by_region[container_id]

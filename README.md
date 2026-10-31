@@ -586,7 +586,10 @@ name such as `[i]` must bind the same index in both patterns:
 
 Repeating a `VALUE` adds containers in order, and the value takes its words in
 the first container that holds it and has a match of its own; a value not
-found there tries the next one. A region located this way names its
+found there tries the next one. A container may itself be inside another
+value (`B=A` and `C=B`): it is located first and its own inside values are
+then aligned on its words, to any depth; values whose rules make each other
+their containers stay unmatched. A region located this way names its
 container in `alignment_located_in`. Values located inside run before the
 copying of identical values, so a located value can be copied.
 
