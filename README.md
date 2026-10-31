@@ -588,6 +588,34 @@ such as `[i]` must bind the same index in both patterns:
 --inside-path 'entries[i].agents[*]=entries[i].subTitle'
 ```
 
+The figure follows one chapter page through the levels. Its JSON gives whole
+sections of the page, the heading and the author statement, together with
+the values printed inside them:
+
+```text
+--inside-path 'designation=heading'
+--inside-path 'title=heading'
+--inside-path 'partNumber=designation'
+--inside-path 'agents[a].name=agents[a].statement'
+--inside-path 'agents[a].description=agents[a].statement'
+--inside-path 'agents[a].affiliation=agents[a].description'
+```
+
+![Alignment in levels: the heading, the author statement and the page number
+are aligned on the whole page; the designation and the title on the heading's
+words, the name and the description on the statement's words; the part number
+on the designation's words and the affiliation on the description's
+words](docs/inside-levels.svg)
+
+Level 0 aligns the heading, the statement and the page number on the whole
+page; the statement matches approximately, as the OCR read `Univerzlty`.
+Level 1 aligns the designation and the title on the heading's words, and the
+name and the description on the statement's words, which read the
+statement's text, `Univerzity`. Level 2 aligns the part number on the
+designation's words and the affiliation on the description's words, where it
+matches exactly. Every value ends up with a box inside its container's box.
+`docs/inside_levels_figure.py` draws the figure.
+
 Repeating a `VALUE` adds containers in order, and the first container whose
 text holds the value is its container, whether that one is found or not. A
 container may itself be inside another value (`B=A` and `C=B`), so levels
