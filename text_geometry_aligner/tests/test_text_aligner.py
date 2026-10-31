@@ -796,6 +796,32 @@ def test_a_value_stays_unmatched_when_the_first_container_holding_it_is_not_foun
     assert regions["entries", 0, "agents", 0].words is None
 
 
+def test_sections_place_the_values_printed_inside_them_as_in_the_readme_figure(lowercase_normalizer) -> None:
+    data = {"heading": "Kapitola 3 Lidová píseň", "designation": "Kapitola 3", "partNumber": "3",
+            "title": "Lidová píseň",
+            "agents": [{"statement": "Jan Novák profesor Univerzity Karlovy", "name": "Jan Novák",
+                        "description": "profesor Univerzity Karlovy", "affiliation": "Univerzity Karlovy"}]}
+    # The running head prints a 3 and Univerzity Karlovy before the chapter does.
+    page = _page(*"Sborník Univerzity Karlovy 3 Kapitola 3 Lidová píseň Jan Novák profesor Univerzity Karlovy".split())
+    on_their_own = _cp_sat_aligner(lowercase_normalizer, word_group_paths=[
+        "heading", "designation", "partNumber", "title", "agents[a].statement", "agents[a].name",
+        "agents[a].description", "agents[a].affiliation"])
+    in_levels = _cp_sat_aligner(lowercase_normalizer, inside_paths={
+        "designation": "heading", "title": "heading", "partNumber": "designation",
+        "agents[a].name": "agents[a].statement", "agents[a].description": "agents[a].statement",
+        "agents[a].affiliation": "agents[a].description"})
+
+    def words(aligner):
+        return {path[-1]: [word.word_index for word in region.words]
+                for path, region in _regions_by_path(aligner.align_data(page, data)).items()}
+
+    expected = {"heading": [4, 5, 6, 7], "designation": [4, 5], "partNumber": [5], "title": [6, 7],
+                "statement": [8, 9, 10, 11, 12], "name": [8, 9], "description": [10, 11, 12],
+                "affiliation": [11, 12]}
+    assert words(in_levels) == expected
+    assert words(on_their_own) == dict(expected, partNumber=[3], affiliation=[1, 2])
+
+
 def test_values_inside_each_other_stay_unmatched(lowercase_normalizer) -> None:
     data = {"A": "a b", "B": "a b", "C": "x"}
     aligner = _cp_sat_aligner(lowercase_normalizer, inside_paths={"A": "B", "B": "A"})

@@ -1,236 +1,239 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="1298" viewBox="0 0 1120 1298">
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="1360" viewBox="0 0 1120 1360">
 <defs>
 <marker id="a-0891b2" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#0891b2"/></marker>
 <marker id="a-15803d" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#15803d"/></marker>
 <marker id="a-2563eb" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2563eb"/></marker>
-<marker id="a-475569" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#475569"/></marker>
-<marker id="a-64748b" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#64748b"/></marker>
 <marker id="a-7c3aed" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#7c3aed"/></marker>
+<marker id="a-94a3b8" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#94a3b8"/></marker>
 <marker id="a-b45309" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b45309"/></marker>
 <marker id="a-c026d3" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#c026d3"/></marker>
-<marker id="a-dc2626" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#dc2626"/></marker>
+<marker id="a-e11d48" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#e11d48"/></marker>
 <marker id="a-ea580c" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#ea580c"/></marker>
 </defs>
-<rect width="1120" height="1298" rx="16" fill="#f8fafc"/>
-<text x="32.0" y="46.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="24" fill="#1e293b" font-weight="800" text-anchor="start" >Alignment in levels</text>
-<text x="32.0" y="72.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#64748b" font-weight="400" text-anchor="start" >Values printed inside other values are aligned one level below them, on the words their container matched.</text>
-<rect x="24" y="96" width="470" height="368" rx="12" fill="#ffffff" stroke="#e2e8f0"/>
-<text x="42.0" y="124.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#1e293b" font-weight="700" text-anchor="start" >Input: the page</text>
-<text x="42.0" y="143.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" fill="#64748b" font-weight="400" text-anchor="start" >ALTO words of a chapter&#x27;s first page</text>
-<rect x="49" y="180" width="420" height="250" rx="4" fill="#fffdf7" stroke="#e7e1cf"/>
-<text x="89.2" y="220.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="16" fill="#1e293b" font-weight="700" text-anchor="start" >Kapitola</text>
-<text x="180.2" y="220.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="16" fill="#1e293b" font-weight="700" text-anchor="start" >3</text>
-<text x="203.8" y="220.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="16" fill="#1e293b" font-weight="700" text-anchor="start" >Lidová</text>
-<text x="275.6" y="220.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="16" fill="#1e293b" font-weight="700" text-anchor="start" >píseň</text>
-<text x="337.8" y="220.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="16" fill="#1e293b" font-weight="700" text-anchor="start" >v</text>
-<text x="361.4" y="220.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="16" fill="#1e293b" font-weight="700" text-anchor="start" >Čechách</text>
-<text x="220.7" y="282.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="start" >Jan</text>
-<text x="258.2" y="282.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="start" >Novák</text>
-<text x="109.7" y="312.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="start" >profesor</text>
-<text x="186.3" y="312.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#b91c1c" font-weight="400" text-anchor="start" >Univerzlty</text>
-<text x="278.6" y="312.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="start" >Karlovy</text>
-<text x="347.3" y="312.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="start" >v</text>
-<text x="369.2" y="312.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="start" >Praze</text>
-<text x="251.8" y="395.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#1e293b" font-weight="400" text-anchor="start" >45</text>
-<path d="M186.3,316.0 q9.8,3 19.6,0 t19.6,0 t19.6,0 t19.6,0" fill="none" stroke="#dc2626" stroke-width="1.3"/>
-<text x="225.4" y="334.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="11" fill="#dc2626" font-weight="400" text-anchor="middle" >OCR misread</text>
-<rect x="510" y="96" width="586" height="368" rx="12" fill="#ffffff" stroke="#e2e8f0"/>
-<text x="528.0" y="124.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#1e293b" font-weight="700" text-anchor="start" >Input: the JSON and the inside rules</text>
-<text x="542.0" y="150.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#64748b" font-weight="400" text-anchor="start" >{</text>
-<circle cx="531" cy="162.5" r="4" fill="#2563eb"/>
-<text x="542.0" y="166.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#1e293b" font-weight="400" text-anchor="start" >  &quot;heading&quot;: &quot;Kapitola 3 Lidová píseň v Čechách&quot;,</text>
-<circle cx="531" cy="179.0" r="4" fill="#7c3aed"/>
-<text x="542.0" y="183.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#1e293b" font-weight="400" text-anchor="start" >  &quot;designation&quot;: &quot;Kapitola 3&quot;,</text>
-<circle cx="531" cy="195.5" r="4" fill="#c026d3"/>
-<text x="542.0" y="199.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#1e293b" font-weight="400" text-anchor="start" >  &quot;partNumber&quot;: &quot;3&quot;,</text>
-<circle cx="531" cy="212.0" r="4" fill="#0891b2"/>
-<text x="542.0" y="216.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#1e293b" font-weight="400" text-anchor="start" >  &quot;title&quot;: &quot;Lidová píseň v Čechách&quot;,</text>
-<text x="542.0" y="232.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#64748b" font-weight="400" text-anchor="start" >  &quot;agents&quot;: [{</text>
-<circle cx="531" cy="245.0" r="4" fill="#15803d"/>
-<text x="542.0" y="249.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#1e293b" font-weight="400" text-anchor="start" >    &quot;statement&quot;: &quot;Jan Novák profesor Univerzity Karlovy v Praze&quot;,</text>
-<circle cx="531" cy="261.5" r="4" fill="#b45309"/>
-<text x="542.0" y="265.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#1e293b" font-weight="400" text-anchor="start" >    &quot;name&quot;: &quot;Jan Novák&quot;,</text>
-<circle cx="531" cy="278.0" r="4" fill="#ea580c"/>
-<text x="542.0" y="282.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#1e293b" font-weight="400" text-anchor="start" >    &quot;description&quot;: &quot;profesor Univerzity Karlovy v Praze&quot;,</text>
-<circle cx="531" cy="294.5" r="4" fill="#dc2626"/>
-<text x="542.0" y="298.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#1e293b" font-weight="400" text-anchor="start" >    &quot;affiliation&quot;: &quot;Univerzity Karlovy v Praze&quot;</text>
-<text x="542.0" y="315.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#64748b" font-weight="400" text-anchor="start" >  }],</text>
-<circle cx="531" cy="327.5" r="4" fill="#475569"/>
-<text x="542.0" y="331.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#1e293b" font-weight="400" text-anchor="start" >  &quot;pageNumber&quot;: &quot;45&quot;</text>
-<text x="542.0" y="348.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#64748b" font-weight="400" text-anchor="start" >}</text>
-<text x="530.0" y="375.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" fill="#64748b" font-weight="700" text-anchor="start" >inside_paths</text>
-<text x="625.0" y="375.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" fill="#64748b" font-weight="400" text-anchor="start" >a value is inside when its text is a substring of its container&#x27;s text</text>
-<text x="530.0" y="398.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#7c3aed" font-weight="600" text-anchor="start" >designation</text>
-<text x="636.0" y="398.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" fill="#94a3b8" font-weight="400" text-anchor="middle" >in</text>
-<text x="649.0" y="398.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#2563eb" font-weight="600" text-anchor="start" >heading</text>
-<text x="530.0" y="417.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#0891b2" font-weight="600" text-anchor="start" >title</text>
-<text x="636.0" y="417.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" fill="#94a3b8" font-weight="400" text-anchor="middle" >in</text>
-<text x="649.0" y="417.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#2563eb" font-weight="600" text-anchor="start" >heading</text>
-<text x="530.0" y="436.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#c026d3" font-weight="600" text-anchor="start" >partNumber</text>
-<text x="636.0" y="436.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" fill="#94a3b8" font-weight="400" text-anchor="middle" >in</text>
-<text x="649.0" y="436.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#7c3aed" font-weight="600" text-anchor="start" >designation</text>
-<text x="745.0" y="398.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#b45309" font-weight="600" text-anchor="start" >agents[a].name</text>
-<text x="907.0" y="398.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" fill="#94a3b8" font-weight="400" text-anchor="middle" >in</text>
-<text x="920.0" y="398.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#15803d" font-weight="600" text-anchor="start" >agents[a].statement</text>
-<text x="745.0" y="417.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#ea580c" font-weight="600" text-anchor="start" >agents[a].description</text>
-<text x="907.0" y="417.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" fill="#94a3b8" font-weight="400" text-anchor="middle" >in</text>
-<text x="920.0" y="417.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#15803d" font-weight="600" text-anchor="start" >agents[a].statement</text>
-<text x="745.0" y="436.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#dc2626" font-weight="600" text-anchor="start" >agents[a].affiliation</text>
-<text x="907.0" y="436.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" fill="#94a3b8" font-weight="400" text-anchor="middle" >in</text>
-<text x="920.0" y="436.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#ea580c" font-weight="600" text-anchor="start" >agents[a].description</text>
-<rect x="24" y="480" width="1072" height="460" rx="12" fill="#ffffff" stroke="#e2e8f0"/>
-<text x="42.0" y="508.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#1e293b" font-weight="700" text-anchor="start" >The recursion</text>
-<text x="42.0" y="527.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" fill="#64748b" font-weight="400" text-anchor="start" >Every level runs the same alignment (candidates → word groups → selector) on its own page of words.</text>
-<rect x="44" y="544" width="146" height="62" rx="8" fill="#f1f5f9"/>
-<text x="58.0" y="563.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e293b" font-weight="700" text-anchor="start" >Level 0</text>
-<text x="58.0" y="581.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" fill="#64748b" font-weight="400" text-anchor="start" >the whole page</text>
-<text x="58.0" y="597.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" fill="#64748b" font-weight="400" text-anchor="start" >reads the OCR</text>
-<rect x="210.0" y="548" width="76.6" height="26" rx="5" fill="#f8fafc" stroke="#cbd5e1"/>
-<text x="248.3" y="565.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="middle" >Kapitola</text>
-<rect x="292.6" y="548" width="21.8" height="26" rx="5" fill="#f8fafc" stroke="#cbd5e1"/>
-<text x="303.6" y="565.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="middle" >3</text>
-<rect x="320.5" y="548" width="61.0" height="26" rx="5" fill="#f8fafc" stroke="#cbd5e1"/>
-<text x="351.0" y="565.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="middle" >Lidová</text>
-<rect x="387.4" y="548" width="53.1" height="26" rx="5" fill="#f8fafc" stroke="#cbd5e1"/>
-<text x="414.0" y="565.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="middle" >píseň</text>
-<rect x="446.6" y="548" width="21.8" height="26" rx="5" fill="#f8fafc" stroke="#cbd5e1"/>
-<text x="457.5" y="565.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="middle" >v</text>
-<rect x="474.4" y="548" width="68.8" height="26" rx="5" fill="#f8fafc" stroke="#cbd5e1"/>
-<text x="508.8" y="565.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="middle" >Čechách</text>
-<rect x="549.2" y="548" width="37.5" height="26" rx="5" fill="#f8fafc" stroke="#cbd5e1"/>
-<text x="568.0" y="565.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="middle" >Jan</text>
-<rect x="592.7" y="548" width="53.1" height="26" rx="5" fill="#f8fafc" stroke="#cbd5e1"/>
-<text x="619.3" y="565.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="middle" >Novák</text>
-<rect x="651.9" y="548" width="76.6" height="26" rx="5" fill="#f8fafc" stroke="#cbd5e1"/>
-<text x="690.2" y="565.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="middle" >profesor</text>
-<rect x="734.5" y="548" width="92.3" height="26" rx="5" fill="#f8fafc" stroke="#cbd5e1"/>
-<text x="780.7" y="565.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="middle" >Univerzlty</text>
-<rect x="832.8" y="548" width="68.8" height="26" rx="5" fill="#f8fafc" stroke="#cbd5e1"/>
-<text x="867.2" y="565.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="middle" >Karlovy</text>
-<rect x="907.6" y="548" width="21.8" height="26" rx="5" fill="#f8fafc" stroke="#cbd5e1"/>
-<text x="918.5" y="565.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="middle" >v</text>
-<rect x="935.5" y="548" width="53.1" height="26" rx="5" fill="#f8fafc" stroke="#cbd5e1"/>
-<text x="962.0" y="565.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="middle" >Praze</text>
-<rect x="994.6" y="548" width="29.7" height="26" rx="5" fill="#f8fafc" stroke="#cbd5e1"/>
-<text x="1009.4" y="565.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="middle" >45</text>
-<path d="M739.5,572 h82.3" stroke="#dc2626" stroke-width="1.5"/>
-<path d="M212.0,580 v7 H541.2 v-7" fill="none" stroke="#2563eb" stroke-width="2.2" stroke-linejoin="round"/>
-<text x="376.6" y="603.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12.5" fill="#2563eb" font-weight="600" text-anchor="middle" >heading</text>
-<text x="376.6" y="619.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" fill="#64748b" font-weight="400" text-anchor="middle" >exact</text>
-<path d="M551.2,580 v7 H986.6 v-7" fill="none" stroke="#15803d" stroke-width="2.2" stroke-linejoin="round"/>
-<text x="768.9" y="603.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12.5" fill="#15803d" font-weight="600" text-anchor="middle" >agents[0].statement</text>
-<text x="768.9" y="619.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" fill="#64748b" font-weight="400" text-anchor="middle" >≈ 0.98 vs the OCR</text>
-<path d="M996.6,580 v7 H1022.3 v-7" fill="none" stroke="#475569" stroke-width="2.2" stroke-linejoin="round"/>
-<text x="1009.4" y="603.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12.5" fill="#475569" font-weight="600" text-anchor="middle" >pageNumber</text>
-<rect x="44" y="694" width="146" height="62" rx="8" fill="#f1f5f9"/>
-<text x="58.0" y="713.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e293b" font-weight="700" text-anchor="start" >Level 1</text>
-<text x="58.0" y="731.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" fill="#64748b" font-weight="400" text-anchor="start" >words of a matched value</text>
-<text x="58.0" y="747.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" fill="#64748b" font-weight="400" text-anchor="start" >read its JSON text</text>
-<rect x="210.0" y="698" width="76.6" height="26" rx="5" fill="#f8fafc" stroke="#cbd5e1"/>
-<text x="248.3" y="715.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="middle" >Kapitola</text>
-<rect x="292.6" y="698" width="21.8" height="26" rx="5" fill="#f8fafc" stroke="#cbd5e1"/>
-<text x="303.6" y="715.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="middle" >3</text>
-<rect x="320.5" y="698" width="61.0" height="26" rx="5" fill="#f8fafc" stroke="#cbd5e1"/>
-<text x="351.0" y="715.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="middle" >Lidová</text>
-<rect x="387.4" y="698" width="53.1" height="26" rx="5" fill="#f8fafc" stroke="#cbd5e1"/>
-<text x="414.0" y="715.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="middle" >píseň</text>
-<rect x="446.6" y="698" width="21.8" height="26" rx="5" fill="#f8fafc" stroke="#cbd5e1"/>
-<text x="457.5" y="715.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="middle" >v</text>
-<rect x="474.4" y="698" width="68.8" height="26" rx="5" fill="#f8fafc" stroke="#cbd5e1"/>
-<text x="508.8" y="715.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="middle" >Čechách</text>
-<rect x="630.0" y="698" width="37.5" height="26" rx="5" fill="#f8fafc" stroke="#cbd5e1"/>
-<text x="648.7" y="715.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="middle" >Jan</text>
-<rect x="673.5" y="698" width="53.1" height="26" rx="5" fill="#f8fafc" stroke="#cbd5e1"/>
-<text x="700.1" y="715.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="middle" >Novák</text>
-<rect x="732.6" y="698" width="76.6" height="26" rx="5" fill="#f8fafc" stroke="#cbd5e1"/>
-<text x="771.0" y="715.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="middle" >profesor</text>
-<rect x="815.3" y="698" width="92.3" height="26" rx="5" fill="#fef3c7" stroke="#d97706"/>
-<text x="861.4" y="715.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="middle" >Univerzity</text>
-<rect x="913.6" y="698" width="68.8" height="26" rx="5" fill="#f8fafc" stroke="#cbd5e1"/>
-<text x="948.0" y="715.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="middle" >Karlovy</text>
-<rect x="988.4" y="698" width="21.8" height="26" rx="5" fill="#f8fafc" stroke="#cbd5e1"/>
-<text x="999.3" y="715.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="middle" >v</text>
-<rect x="1016.2" y="698" width="53.1" height="26" rx="5" fill="#f8fafc" stroke="#cbd5e1"/>
-<text x="1042.8" y="715.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="middle" >Praze</text>
-<path d="M376.6,633.0 C376.6,665.5 240.0,665.5 240.0,692.0" fill="none" stroke="#2563eb" stroke-width="1.8" stroke-dasharray="5 4" marker-end="url(#a-2563eb)"/>
-<path d="M768.9,633.0 C768.9,665.5 660.0,665.5 660.0,692.0" fill="none" stroke="#15803d" stroke-width="1.8" stroke-dasharray="5 4" marker-end="url(#a-15803d)"/>
-<path d="M212.0,730 v7 H312.5 v-7" fill="none" stroke="#7c3aed" stroke-width="2.2" stroke-linejoin="round"/>
-<text x="262.2" y="753.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12.5" fill="#7c3aed" font-weight="600" text-anchor="middle" >designation</text>
-<text x="262.2" y="769.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" fill="#64748b" font-weight="400" text-anchor="middle" >exact</text>
-<path d="M322.5,730 v7 H541.2 v-7" fill="none" stroke="#0891b2" stroke-width="2.2" stroke-linejoin="round"/>
-<text x="431.9" y="753.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12.5" fill="#0891b2" font-weight="600" text-anchor="middle" >title</text>
-<text x="431.9" y="769.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" fill="#64748b" font-weight="400" text-anchor="middle" >exact</text>
-<path d="M632.0,730 v7 H724.6 v-7" fill="none" stroke="#b45309" stroke-width="2.2" stroke-linejoin="round"/>
-<text x="678.3" y="753.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12.5" fill="#b45309" font-weight="600" text-anchor="middle" >agents[0].name</text>
-<text x="678.3" y="769.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" fill="#64748b" font-weight="400" text-anchor="middle" >exact</text>
-<path d="M734.6,730 v7 H1067.4 v-7" fill="none" stroke="#ea580c" stroke-width="2.2" stroke-linejoin="round"/>
-<text x="901.0" y="753.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12.5" fill="#ea580c" font-weight="600" text-anchor="middle" >agents[0].description</text>
-<text x="901.0" y="769.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" fill="#64748b" font-weight="400" text-anchor="middle" >exact</text>
-<rect x="44" y="844" width="146" height="62" rx="8" fill="#f1f5f9"/>
-<text x="58.0" y="863.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e293b" font-weight="700" text-anchor="start" >Level 2</text>
-<text x="58.0" y="881.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" fill="#64748b" font-weight="400" text-anchor="start" >words of a value</text>
-<text x="58.0" y="897.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" fill="#64748b" font-weight="400" text-anchor="start" >found on level 1</text>
-<rect x="210.0" y="848" width="76.6" height="26" rx="5" fill="#f8fafc" stroke="#cbd5e1"/>
-<text x="248.3" y="865.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="middle" >Kapitola</text>
-<rect x="292.6" y="848" width="21.8" height="26" rx="5" fill="#f8fafc" stroke="#cbd5e1"/>
-<text x="303.6" y="865.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="middle" >3</text>
-<rect x="732.6" y="848" width="76.6" height="26" rx="5" fill="#f8fafc" stroke="#cbd5e1"/>
-<text x="771.0" y="865.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="middle" >profesor</text>
-<rect x="815.3" y="848" width="92.3" height="26" rx="5" fill="#fef3c7" stroke="#d97706"/>
-<text x="861.4" y="865.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="middle" >Univerzity</text>
-<rect x="913.6" y="848" width="68.8" height="26" rx="5" fill="#f8fafc" stroke="#cbd5e1"/>
-<text x="948.0" y="865.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="middle" >Karlovy</text>
-<rect x="988.4" y="848" width="21.8" height="26" rx="5" fill="#f8fafc" stroke="#cbd5e1"/>
-<text x="999.3" y="865.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="middle" >v</text>
-<rect x="1016.2" y="848" width="53.1" height="26" rx="5" fill="#f8fafc" stroke="#cbd5e1"/>
-<text x="1042.8" y="865.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="middle" >Praze</text>
-<path d="M262.2,783.0 C262.2,815.5 240.0,815.5 240.0,842.0" fill="none" stroke="#7c3aed" stroke-width="1.8" stroke-dasharray="5 4" marker-end="url(#a-7c3aed)"/>
-<path d="M901.0,783.0 C901.0,815.5 762.6,815.5 762.6,842.0" fill="none" stroke="#ea580c" stroke-width="1.8" stroke-dasharray="5 4" marker-end="url(#a-ea580c)"/>
-<path d="M294.6,880 v7 H312.5 v-7" fill="none" stroke="#c026d3" stroke-width="2.2" stroke-linejoin="round"/>
-<text x="303.6" y="903.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12.5" fill="#c026d3" font-weight="600" text-anchor="middle" >partNumber</text>
-<text x="303.6" y="919.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" fill="#64748b" font-weight="400" text-anchor="middle" >exact</text>
-<path d="M817.3,880 v7 H1067.4 v-7" fill="none" stroke="#dc2626" stroke-width="2.2" stroke-linejoin="round"/>
-<text x="942.3" y="903.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12.5" fill="#dc2626" font-weight="600" text-anchor="middle" >agents[0].affiliation</text>
-<text x="942.3" y="919.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" fill="#64748b" font-weight="400" text-anchor="middle" >exact, although the OCR misread it</text>
-<rect x="811.3" y="653" width="236" height="22" rx="11" fill="#fef3c7"/>
-<text x="823.3" y="668.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" fill="#92400e" font-weight="600" text-anchor="start" >Univerzlty reads Univerzity here</text>
-<rect x="24" y="956" width="470" height="322" rx="12" fill="#ffffff" stroke="#e2e8f0"/>
-<text x="42.0" y="984.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#1e293b" font-weight="700" text-anchor="start" >Output: nested boxes on the page</text>
-<text x="42.0" y="1003.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" fill="#64748b" font-weight="400" text-anchor="start" >each value&#x27;s box, coloured as in the JSON</text>
-<rect x="49" y="1016" width="420" height="250" rx="4" fill="#fffdf7" stroke="#e7e1cf"/>
-<text x="89.2" y="1056.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="16" fill="#1e293b" font-weight="700" text-anchor="start" >Kapitola</text>
-<text x="180.2" y="1056.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="16" fill="#1e293b" font-weight="700" text-anchor="start" >3</text>
-<text x="203.8" y="1056.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="16" fill="#1e293b" font-weight="700" text-anchor="start" >Lidová</text>
-<text x="275.6" y="1056.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="16" fill="#1e293b" font-weight="700" text-anchor="start" >píseň</text>
-<text x="337.8" y="1056.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="16" fill="#1e293b" font-weight="700" text-anchor="start" >v</text>
-<text x="361.4" y="1056.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="16" fill="#1e293b" font-weight="700" text-anchor="start" >Čechách</text>
-<text x="220.7" y="1118.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="start" >Jan</text>
-<text x="258.2" y="1118.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="start" >Novák</text>
-<text x="109.7" y="1148.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="start" >profesor</text>
-<text x="186.3" y="1148.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="start" >Univerzlty</text>
-<text x="278.6" y="1148.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="start" >Karlovy</text>
-<text x="347.3" y="1148.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="start" >v</text>
-<text x="369.2" y="1148.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="start" >Praze</text>
-<text x="251.8" y="1231.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#1e293b" font-weight="400" text-anchor="start" >45</text>
-<rect x="77.2" y="1030.4" width="363.7" height="41.6" rx="4" fill="#2563eb" fill-opacity="0.06" stroke="#2563eb" stroke-width="1.8"/>
-<rect x="84.2" y="1037.4" width="110.7" height="27.6" rx="4" fill="#7c3aed" fill-opacity="0.06" stroke="#7c3aed" stroke-width="1.8"/>
-<rect x="178.2" y="1040.4" width="13.6" height="21.6" rx="4" fill="#c026d3" fill-opacity="0.06" stroke="#c026d3" stroke-width="1.8"/>
-<rect x="198.8" y="1037.4" width="235.0" height="27.6" rx="4" fill="#0891b2" fill-opacity="0.06" stroke="#0891b2" stroke-width="1.8"/>
-<rect x="97.7" y="1095.0" width="322.6" height="68.3" rx="4" fill="#15803d" fill-opacity="0.06" stroke="#15803d" stroke-width="1.8"/>
-<rect x="215.7" y="1102.0" width="86.6" height="24.3" rx="4" fill="#b45309" fill-opacity="0.06" stroke="#b45309" stroke-width="1.8"/>
-<rect x="104.7" y="1132.0" width="308.6" height="24.3" rx="4" fill="#ea580c" fill-opacity="0.06" stroke="#ea580c" stroke-width="1.8"/>
-<rect x="184.3" y="1135.0" width="226.0" height="18.3" rx="4" fill="#dc2626" fill-opacity="0.06" stroke="#dc2626" stroke-width="1.8"/>
-<rect x="244.8" y="1213.8" width="28.4" height="27.2" rx="4" fill="#475569" fill-opacity="0.06" stroke="#475569" stroke-width="1.8"/>
-<rect x="510" y="956" width="586" height="322" rx="12" fill="#ffffff" stroke="#e2e8f0"/>
-<text x="528.0" y="984.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#1e293b" font-weight="700" text-anchor="start" >What the levels give</text>
-<text x="530.0" y="1004.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="13" fill="#1e293b" font-weight="400" text-anchor="start" >A value takes words only within its container&#x27;s words, so the part</text>
-<text x="530.0" y="1023.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="13" fill="#1e293b" font-weight="400" text-anchor="start" >number, the name and the affiliation cannot lose them to the heading,</text>
-<text x="530.0" y="1042.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="13" fill="#1e293b" font-weight="400" text-anchor="start" >the statement or the description that print them, nor take them.</text>
-<text x="530.0" y="1061.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="13" fill="#1e293b" font-weight="400" text-anchor="start" ></text>
-<text x="530.0" y="1080.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="13" fill="#1e293b" font-weight="400" text-anchor="start" >Deeper levels read the container&#x27;s JSON text over its words: the</text>
-<text x="530.0" y="1099.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="13" fill="#1e293b" font-weight="400" text-anchor="start" >longer container text matched the OCR, so a short value inside it</text>
-<text x="530.0" y="1118.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="13" fill="#1e293b" font-weight="400" text-anchor="start" >matches the text the container gives (inside_location=json).</text>
-<text x="530.0" y="1137.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="13" fill="#1e293b" font-weight="400" text-anchor="start" ></text>
-<text x="530.0" y="1156.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="13" fill="#1e293b" font-weight="400" text-anchor="start" >A value whose container is not found, or which is not found among</text>
-<text x="530.0" y="1175.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="13" fill="#1e293b" font-weight="400" text-anchor="start" >its container&#x27;s words, stays unmatched.</text>
+<rect width="1120" height="1360" rx="16" fill="#f8fafc"/>
+<text x="32.0" y="46.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="24" fill="#1e293b" font-weight="800" text-anchor="start">Alignment in levels</text>
+<text x="32.0" y="72.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#64748b" font-weight="400" text-anchor="start">A long section matches its place on the page surely; the short values printed inside it are looked for only among its words.</text>
+<rect x="24" y="96" width="470" height="330" rx="12" fill="#ffffff" stroke="#e2e8f0"/>
+<text x="42.0" y="124.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#1e293b" font-weight="700" text-anchor="start">Input: the page</text>
+<text x="42.0" y="143.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" fill="#64748b" font-weight="400" text-anchor="start">ALTO words of a chapter&#x27;s first page</text>
+<rect x="49" y="166" width="420" height="232" rx="4" fill="#fffdf7" stroke="#e7e1cf"/>
+<text x="225.9" y="200.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="11.5" fill="#64748b" font-weight="400" text-anchor="start">Sborník</text>
+<text x="288.4" y="200.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="11.5" fill="#64748b" font-weight="400" text-anchor="start">Univerzity</text>
+<text x="371.6" y="200.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="11.5" fill="#64748b" font-weight="400" text-anchor="start">Karlovy</text>
+<text x="434.1" y="200.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="11.5" fill="#64748b" font-weight="400" text-anchor="start">3</text>
+<text x="135.7" y="264.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="17" fill="#1e293b" font-weight="700" text-anchor="start">Kapitola</text>
+<text x="231.5" y="264.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="17" fill="#1e293b" font-weight="700" text-anchor="start">3</text>
+<text x="255.8" y="264.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="17" fill="#1e293b" font-weight="700" text-anchor="start">Lidová</text>
+<text x="331.2" y="264.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="17" fill="#1e293b" font-weight="700" text-anchor="start">píseň</text>
+<text x="219.5" y="326.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13.5" fill="#1e293b" font-weight="400" text-anchor="start">Jan</text>
+<text x="257.9" y="326.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13.5" fill="#1e293b" font-weight="400" text-anchor="start">Novák</text>
+<text x="143.4" y="356.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13.5" fill="#1e293b" font-weight="400" text-anchor="start">profesor</text>
+<text x="222.4" y="356.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13.5" fill="#1e293b" font-weight="400" text-anchor="start">Univerzity</text>
+<text x="317.7" y="356.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13.5" fill="#1e293b" font-weight="400" text-anchor="start">Karlovy</text>
+<path d="M77,212 H441" stroke="#d6cfba" stroke-width="1"/>
+<text x="77.0" y="200.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" fill="#94a3b8" font-weight="400" text-anchor="start">running head</text>
+<rect x="510" y="96" width="586" height="330" rx="12" fill="#ffffff" stroke="#e2e8f0"/>
+<text x="528.0" y="124.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#1e293b" font-weight="700" text-anchor="start">Input: the JSON and the inside rules</text>
+<text x="542.0" y="146.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#64748b" font-weight="400" text-anchor="start">{</text>
+<circle cx="531" cy="158.5" r="4" fill="#2563eb"/>
+<text x="542.0" y="162.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#1e293b" font-weight="400" text-anchor="start">  &quot;heading&quot;: &quot;Kapitola 3 Lidová píseň&quot;,</text>
+<circle cx="531" cy="175.0" r="4" fill="#7c3aed"/>
+<text x="542.0" y="179.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#1e293b" font-weight="400" text-anchor="start">  &quot;designation&quot;: &quot;Kapitola 3&quot;,</text>
+<circle cx="531" cy="191.5" r="4" fill="#c026d3"/>
+<text x="542.0" y="195.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#1e293b" font-weight="400" text-anchor="start">  &quot;partNumber&quot;: &quot;3&quot;,</text>
+<circle cx="531" cy="208.0" r="4" fill="#0891b2"/>
+<text x="542.0" y="212.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#1e293b" font-weight="400" text-anchor="start">  &quot;title&quot;: &quot;Lidová píseň&quot;,</text>
+<text x="542.0" y="228.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#64748b" font-weight="400" text-anchor="start">  &quot;agents&quot;: [{</text>
+<circle cx="531" cy="241.0" r="4" fill="#15803d"/>
+<text x="542.0" y="245.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#1e293b" font-weight="400" text-anchor="start">    &quot;statement&quot;: &quot;Jan Novák profesor Univerzity Karlovy&quot;,</text>
+<circle cx="531" cy="257.5" r="4" fill="#b45309"/>
+<text x="542.0" y="261.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#1e293b" font-weight="400" text-anchor="start">    &quot;name&quot;: &quot;Jan Novák&quot;,</text>
+<circle cx="531" cy="274.0" r="4" fill="#ea580c"/>
+<text x="542.0" y="278.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#1e293b" font-weight="400" text-anchor="start">    &quot;description&quot;: &quot;profesor Univerzity Karlovy&quot;,</text>
+<circle cx="531" cy="290.5" r="4" fill="#e11d48"/>
+<text x="542.0" y="294.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#1e293b" font-weight="400" text-anchor="start">    &quot;affiliation&quot;: &quot;Univerzity Karlovy&quot;</text>
+<text x="542.0" y="311.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#64748b" font-weight="400" text-anchor="start">  }]</text>
+<text x="542.0" y="327.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#64748b" font-weight="400" text-anchor="start">}</text>
+<text x="530.0" y="360.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" fill="#64748b" font-weight="700" text-anchor="start">inside_paths</text>
+<text x="625.0" y="360.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" fill="#64748b" font-weight="400" text-anchor="start">a value is inside when its text is a substring of its container&#x27;s text</text>
+<text x="530.0" y="383.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#7c3aed" font-weight="600" text-anchor="start">designation</text>
+<text x="636.0" y="383.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" fill="#94a3b8" font-weight="400" text-anchor="middle">in</text>
+<text x="649.0" y="383.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#2563eb" font-weight="600" text-anchor="start">heading</text>
+<text x="530.0" y="402.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#0891b2" font-weight="600" text-anchor="start">title</text>
+<text x="636.0" y="402.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" fill="#94a3b8" font-weight="400" text-anchor="middle">in</text>
+<text x="649.0" y="402.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#2563eb" font-weight="600" text-anchor="start">heading</text>
+<text x="530.0" y="421.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#c026d3" font-weight="600" text-anchor="start">partNumber</text>
+<text x="636.0" y="421.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" fill="#94a3b8" font-weight="400" text-anchor="middle">in</text>
+<text x="649.0" y="421.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#7c3aed" font-weight="600" text-anchor="start">designation</text>
+<text x="745.0" y="383.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#b45309" font-weight="600" text-anchor="start">agents[a].name</text>
+<text x="907.0" y="383.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" fill="#94a3b8" font-weight="400" text-anchor="middle">in</text>
+<text x="920.0" y="383.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#15803d" font-weight="600" text-anchor="start">agents[a].statement</text>
+<text x="745.0" y="402.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#ea580c" font-weight="600" text-anchor="start">agents[a].description</text>
+<text x="907.0" y="402.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" fill="#94a3b8" font-weight="400" text-anchor="middle">in</text>
+<text x="920.0" y="402.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#15803d" font-weight="600" text-anchor="start">agents[a].statement</text>
+<text x="745.0" y="421.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#e11d48" font-weight="600" text-anchor="start">agents[a].affiliation</text>
+<text x="907.0" y="421.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" fill="#94a3b8" font-weight="400" text-anchor="middle">in</text>
+<text x="920.0" y="421.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#ea580c" font-weight="600" text-anchor="start">agents[a].description</text>
+<rect x="24" y="442" width="1072" height="490" rx="12" fill="#ffffff" stroke="#e2e8f0"/>
+<text x="42.0" y="470.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#1e293b" font-weight="700" text-anchor="start">The recursion</text>
+<text x="42.0" y="489.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" fill="#64748b" font-weight="400" text-anchor="start">Every level runs the same alignment (candidates → word groups → selector) on its own page of words.</text>
+<rect x="44" y="508" width="146" height="62" rx="8" fill="#f1f5f9"/>
+<text x="58.0" y="527.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e293b" font-weight="700" text-anchor="start">Level 0</text>
+<text x="58.0" y="545.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" fill="#64748b" font-weight="400" text-anchor="start">the whole page</text>
+<text x="58.0" y="561.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" fill="#64748b" font-weight="400" text-anchor="start">reads the OCR</text>
+<rect x="216.0" y="512" width="68.8" height="26" rx="5" fill="#f1f5f9" stroke="#e2e8f0"/>
+<text x="250.4" y="529.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#94a3b8" font-weight="400" text-anchor="middle">Sborník</text>
+<rect x="290.8" y="512" width="92.3" height="26" rx="5" fill="#f1f5f9" stroke="#e2e8f0"/>
+<text x="337.0" y="529.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#94a3b8" font-weight="400" text-anchor="middle">Univerzity</text>
+<rect x="389.1" y="512" width="68.8" height="26" rx="5" fill="#f1f5f9" stroke="#e2e8f0"/>
+<text x="423.5" y="529.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#94a3b8" font-weight="400" text-anchor="middle">Karlovy</text>
+<rect x="463.9" y="512" width="21.8" height="26" rx="5" fill="#f1f5f9" stroke="#e2e8f0"/>
+<text x="474.8" y="529.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#94a3b8" font-weight="400" text-anchor="middle">3</text>
+<rect x="491.8" y="512" width="76.6" height="26" rx="5" fill="#f8fafc" stroke="#cbd5e1"/>
+<text x="530.1" y="529.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="middle">Kapitola</text>
+<rect x="574.4" y="512" width="21.8" height="26" rx="5" fill="#f8fafc" stroke="#cbd5e1"/>
+<text x="585.3" y="529.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="middle">3</text>
+<rect x="602.2" y="512" width="61.0" height="26" rx="5" fill="#f8fafc" stroke="#cbd5e1"/>
+<text x="632.7" y="529.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="middle">Lidová</text>
+<rect x="669.2" y="512" width="53.1" height="26" rx="5" fill="#f8fafc" stroke="#cbd5e1"/>
+<text x="695.8" y="529.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="middle">píseň</text>
+<rect x="728.4" y="512" width="37.5" height="26" rx="5" fill="#f8fafc" stroke="#cbd5e1"/>
+<text x="747.1" y="529.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="middle">Jan</text>
+<rect x="771.8" y="512" width="53.1" height="26" rx="5" fill="#f8fafc" stroke="#cbd5e1"/>
+<text x="798.4" y="529.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="middle">Novák</text>
+<rect x="831.0" y="512" width="76.6" height="26" rx="5" fill="#f8fafc" stroke="#cbd5e1"/>
+<text x="869.3" y="529.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="middle">profesor</text>
+<rect x="913.6" y="512" width="92.3" height="26" rx="5" fill="#f8fafc" stroke="#cbd5e1"/>
+<text x="959.8" y="529.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="middle">Univerzity</text>
+<rect x="1011.9" y="512" width="68.8" height="26" rx="5" fill="#f8fafc" stroke="#cbd5e1"/>
+<text x="1046.3" y="529.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="middle">Karlovy</text>
+<path d="M218.0,544 v7 H483.8 v-7" fill="none" stroke="#94a3b8" stroke-width="2.2" stroke-linejoin="round" stroke-dasharray="4 3"/>
+<text x="350.9" y="567.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" fill="#94a3b8" font-weight="600" text-anchor="middle">running head</text>
+<text x="350.9" y="583.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" fill="#94a3b8" font-weight="400" text-anchor="middle">in no value: holds a 3 and</text>
+<text x="350.9" y="599.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" fill="#94a3b8" font-weight="400" text-anchor="middle">Univerzity Karlovy as well</text>
+<path d="M493.8,544 v7 H720.4 v-7" fill="none" stroke="#2563eb" stroke-width="2.2" stroke-linejoin="round"/>
+<text x="607.0" y="567.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12.5" fill="#2563eb" font-weight="600" text-anchor="middle">heading</text>
+<text x="607.0" y="583.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" fill="#64748b" font-weight="400" text-anchor="middle">long: one place on the page</text>
+<path d="M730.4,544 v7 H1078.7 v-7" fill="none" stroke="#15803d" stroke-width="2.2" stroke-linejoin="round"/>
+<text x="904.5" y="567.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12.5" fill="#15803d" font-weight="600" text-anchor="middle">agents[0].statement</text>
+<text x="904.5" y="583.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" fill="#64748b" font-weight="400" text-anchor="middle">long: one place on the page</text>
+<rect x="44" y="666" width="146" height="62" rx="8" fill="#f1f5f9"/>
+<text x="58.0" y="685.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e293b" font-weight="700" text-anchor="start">Level 1</text>
+<text x="58.0" y="703.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" fill="#64748b" font-weight="400" text-anchor="start">words of a matched value</text>
+<text x="58.0" y="719.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" fill="#64748b" font-weight="400" text-anchor="start">read its JSON text</text>
+<rect x="491.8" y="670" width="76.6" height="26" rx="5" fill="#f8fafc" stroke="#cbd5e1"/>
+<text x="530.1" y="687.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="middle">Kapitola</text>
+<rect x="574.4" y="670" width="21.8" height="26" rx="5" fill="#f8fafc" stroke="#cbd5e1"/>
+<text x="585.3" y="687.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="middle">3</text>
+<rect x="602.2" y="670" width="61.0" height="26" rx="5" fill="#f8fafc" stroke="#cbd5e1"/>
+<text x="632.7" y="687.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="middle">Lidová</text>
+<rect x="669.2" y="670" width="53.1" height="26" rx="5" fill="#f8fafc" stroke="#cbd5e1"/>
+<text x="695.8" y="687.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="middle">píseň</text>
+<rect x="728.4" y="670" width="37.5" height="26" rx="5" fill="#f8fafc" stroke="#cbd5e1"/>
+<text x="747.1" y="687.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="middle">Jan</text>
+<rect x="771.8" y="670" width="53.1" height="26" rx="5" fill="#f8fafc" stroke="#cbd5e1"/>
+<text x="798.4" y="687.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="middle">Novák</text>
+<rect x="831.0" y="670" width="76.6" height="26" rx="5" fill="#f8fafc" stroke="#cbd5e1"/>
+<text x="869.3" y="687.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="middle">profesor</text>
+<rect x="913.6" y="670" width="92.3" height="26" rx="5" fill="#f8fafc" stroke="#cbd5e1"/>
+<text x="959.8" y="687.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="middle">Univerzity</text>
+<rect x="1011.9" y="670" width="68.8" height="26" rx="5" fill="#f8fafc" stroke="#cbd5e1"/>
+<text x="1046.3" y="687.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="middle">Karlovy</text>
+<path d="M507.8,590.0 C507.8,620.0 515.8,636.0 515.8,664.0" fill="none" stroke="#2563eb" stroke-width="1.8" stroke-dasharray="5 4" marker-end="url(#a-2563eb)"/>
+<path d="M744.4,590.0 C744.4,620.0 752.4,636.0 752.4,664.0" fill="none" stroke="#15803d" stroke-width="1.8" stroke-dasharray="5 4" marker-end="url(#a-15803d)"/>
+<path d="M493.8,702 v7 H594.2 v-7" fill="none" stroke="#7c3aed" stroke-width="2.2" stroke-linejoin="round"/>
+<text x="544.0" y="725.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12.5" fill="#7c3aed" font-weight="600" text-anchor="middle">designation</text>
+<path d="M604.2,702 v7 H720.4 v-7" fill="none" stroke="#0891b2" stroke-width="2.2" stroke-linejoin="round"/>
+<text x="662.3" y="725.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12.5" fill="#0891b2" font-weight="600" text-anchor="middle">title</text>
+<path d="M730.4,702 v7 H823.0 v-7" fill="none" stroke="#b45309" stroke-width="2.2" stroke-linejoin="round"/>
+<text x="776.7" y="725.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12.5" fill="#b45309" font-weight="600" text-anchor="middle">agents[0].name</text>
+<path d="M833.0,702 v7 H1078.7 v-7" fill="none" stroke="#ea580c" stroke-width="2.2" stroke-linejoin="round"/>
+<text x="955.9" y="725.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12.5" fill="#ea580c" font-weight="600" text-anchor="middle">agents[0].description</text>
+<rect x="44" y="824" width="146" height="62" rx="8" fill="#f1f5f9"/>
+<text x="58.0" y="843.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e293b" font-weight="700" text-anchor="start">Level 2</text>
+<text x="58.0" y="861.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" fill="#64748b" font-weight="400" text-anchor="start">words of a value</text>
+<text x="58.0" y="877.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" fill="#64748b" font-weight="400" text-anchor="start">found on level 1</text>
+<rect x="491.8" y="828" width="76.6" height="26" rx="5" fill="#f8fafc" stroke="#cbd5e1"/>
+<text x="530.1" y="845.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="middle">Kapitola</text>
+<rect x="574.4" y="828" width="21.8" height="26" rx="5" fill="#f8fafc" stroke="#cbd5e1"/>
+<text x="585.3" y="845.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="middle">3</text>
+<rect x="831.0" y="828" width="76.6" height="26" rx="5" fill="#f8fafc" stroke="#cbd5e1"/>
+<text x="869.3" y="845.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="middle">profesor</text>
+<rect x="913.6" y="828" width="92.3" height="26" rx="5" fill="#f8fafc" stroke="#cbd5e1"/>
+<text x="959.8" y="845.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="middle">Univerzity</text>
+<rect x="1011.9" y="828" width="68.8" height="26" rx="5" fill="#f8fafc" stroke="#cbd5e1"/>
+<text x="1046.3" y="845.5" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#1e293b" font-weight="400" text-anchor="middle">Karlovy</text>
+<path d="M507.8,748.0 C507.8,778.0 515.8,794.0 515.8,822.0" fill="none" stroke="#7c3aed" stroke-width="1.8" stroke-dasharray="5 4" marker-end="url(#a-7c3aed)"/>
+<path d="M847.0,748.0 C847.0,778.0 855.0,794.0 855.0,822.0" fill="none" stroke="#ea580c" stroke-width="1.8" stroke-dasharray="5 4" marker-end="url(#a-ea580c)"/>
+<path d="M576.4,860 v7 H594.2 v-7" fill="none" stroke="#c026d3" stroke-width="2.2" stroke-linejoin="round"/>
+<text x="585.3" y="883.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12.5" fill="#c026d3" font-weight="600" text-anchor="middle">partNumber</text>
+<text x="585.3" y="899.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" fill="#15803d" font-weight="400" text-anchor="middle">the 3 of Kapitola 3</text>
+<path d="M915.6,860 v7 H1078.7 v-7" fill="none" stroke="#e11d48" stroke-width="2.2" stroke-linejoin="round"/>
+<text x="997.2" y="883.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12.5" fill="#e11d48" font-weight="600" text-anchor="middle">agents[0].affiliation</text>
+<text x="997.2" y="899.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" fill="#15803d" font-weight="400" text-anchor="middle">the author&#x27;s, not the running head&#x27;s</text>
+<rect x="24" y="948" width="528" height="316" rx="12" fill="#ffffff" stroke="#e2e8f0"/>
+<text x="42.0" y="976.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#1e293b" font-weight="700" text-anchor="start">Each value aligned on its own</text>
+<text x="42.0" y="995.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" fill="#64748b" font-weight="400" text-anchor="start">a short value takes the first place its text is printed</text>
+<rect x="78" y="1010" width="420" height="232" rx="4" fill="#fffdf7" stroke="#e7e1cf"/>
+<text x="254.9" y="1044.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="11.5" fill="#64748b" font-weight="400" text-anchor="start">Sborník</text>
+<text x="317.4" y="1044.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="11.5" fill="#64748b" font-weight="400" text-anchor="start">Univerzity</text>
+<text x="400.6" y="1044.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="11.5" fill="#64748b" font-weight="400" text-anchor="start">Karlovy</text>
+<text x="463.1" y="1044.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="11.5" fill="#64748b" font-weight="400" text-anchor="start">3</text>
+<text x="164.7" y="1108.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="17" fill="#1e293b" font-weight="700" text-anchor="start">Kapitola</text>
+<text x="260.5" y="1108.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="17" fill="#1e293b" font-weight="700" text-anchor="start">3</text>
+<text x="284.8" y="1108.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="17" fill="#1e293b" font-weight="700" text-anchor="start">Lidová</text>
+<text x="360.2" y="1108.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="17" fill="#1e293b" font-weight="700" text-anchor="start">píseň</text>
+<text x="248.5" y="1170.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13.5" fill="#1e293b" font-weight="400" text-anchor="start">Jan</text>
+<text x="286.9" y="1170.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13.5" fill="#1e293b" font-weight="400" text-anchor="start">Novák</text>
+<text x="172.4" y="1200.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13.5" fill="#1e293b" font-weight="400" text-anchor="start">profesor</text>
+<text x="251.4" y="1200.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13.5" fill="#1e293b" font-weight="400" text-anchor="start">Univerzity</text>
+<text x="346.7" y="1200.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13.5" fill="#1e293b" font-weight="400" text-anchor="start">Karlovy</text>
+<path d="M106,1056 H470" stroke="#d6cfba" stroke-width="1"/>
+<text x="106.0" y="1044.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" fill="#94a3b8" font-weight="400" text-anchor="start">running head</text>
+<rect x="152.7" y="1081.5" width="270.7" height="42.7" rx="4" fill="#2563eb" fill-opacity="0.07" stroke="#2563eb" stroke-width="1.8"/>
+<rect x="160.4" y="1146.5" width="255.2" height="68.8" rx="4" fill="#15803d" fill-opacity="0.07" stroke="#15803d" stroke-width="1.8"/>
+<rect x="159.7" y="1088.5" width="116.1" height="28.7" rx="4" fill="#7c3aed" fill-opacity="0.07" stroke="#7c3aed" stroke-width="1.8"/>
+<rect x="279.8" y="1088.5" width="136.6" height="28.7" rx="4" fill="#0891b2" fill-opacity="0.07" stroke="#0891b2" stroke-width="1.8"/>
+<rect x="243.5" y="1153.5" width="89.0" height="24.8" rx="4" fill="#b45309" fill-opacity="0.07" stroke="#b45309" stroke-width="1.8"/>
+<rect x="167.4" y="1183.5" width="241.2" height="24.8" rx="4" fill="#ea580c" fill-opacity="0.07" stroke="#ea580c" stroke-width="1.8"/>
+<rect x="461.1" y="1032.2" width="10.9" height="16.7" rx="4" fill="#c026d3" fill-opacity="0.07" stroke="#c026d3" stroke-width="1.8"/>
+<circle cx="466.5" cy="1057.9" r="8" fill="#dc2626"/>
+<path d="M463.5,1054.9 l6,6 M469.5,1054.9 l-6,6" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+<rect x="315.4" y="1032.2" width="135.7" height="16.7" rx="4" fill="#e11d48" fill-opacity="0.07" stroke="#e11d48" stroke-width="1.8"/>
+<circle cx="383.2" cy="1057.9" r="8" fill="#dc2626"/>
+<path d="M380.2,1054.9 l6,6 M386.2,1054.9 l-6,6" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+<rect x="568" y="948" width="528" height="316" rx="12" fill="#ffffff" stroke="#e2e8f0"/>
+<text x="586.0" y="976.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#1e293b" font-weight="700" text-anchor="start">Aligned in levels</text>
+<text x="586.0" y="995.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" fill="#64748b" font-weight="400" text-anchor="start">a value inside another takes words only among its container&#x27;s</text>
+<rect x="622" y="1010" width="420" height="232" rx="4" fill="#fffdf7" stroke="#e7e1cf"/>
+<text x="798.9" y="1044.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="11.5" fill="#64748b" font-weight="400" text-anchor="start">Sborník</text>
+<text x="861.4" y="1044.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="11.5" fill="#64748b" font-weight="400" text-anchor="start">Univerzity</text>
+<text x="944.6" y="1044.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="11.5" fill="#64748b" font-weight="400" text-anchor="start">Karlovy</text>
+<text x="1007.1" y="1044.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="11.5" fill="#64748b" font-weight="400" text-anchor="start">3</text>
+<text x="708.7" y="1108.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="17" fill="#1e293b" font-weight="700" text-anchor="start">Kapitola</text>
+<text x="804.5" y="1108.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="17" fill="#1e293b" font-weight="700" text-anchor="start">3</text>
+<text x="828.8" y="1108.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="17" fill="#1e293b" font-weight="700" text-anchor="start">Lidová</text>
+<text x="904.2" y="1108.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="17" fill="#1e293b" font-weight="700" text-anchor="start">píseň</text>
+<text x="792.5" y="1170.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13.5" fill="#1e293b" font-weight="400" text-anchor="start">Jan</text>
+<text x="830.9" y="1170.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13.5" fill="#1e293b" font-weight="400" text-anchor="start">Novák</text>
+<text x="716.4" y="1200.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13.5" fill="#1e293b" font-weight="400" text-anchor="start">profesor</text>
+<text x="795.4" y="1200.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13.5" fill="#1e293b" font-weight="400" text-anchor="start">Univerzity</text>
+<text x="890.7" y="1200.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13.5" fill="#1e293b" font-weight="400" text-anchor="start">Karlovy</text>
+<path d="M650,1056 H1014" stroke="#d6cfba" stroke-width="1"/>
+<text x="650.0" y="1044.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" fill="#94a3b8" font-weight="400" text-anchor="start">running head</text>
+<rect x="696.7" y="1081.5" width="270.7" height="42.7" rx="4" fill="#2563eb" fill-opacity="0.07" stroke="#2563eb" stroke-width="1.8"/>
+<rect x="704.4" y="1146.5" width="255.2" height="68.8" rx="4" fill="#15803d" fill-opacity="0.07" stroke="#15803d" stroke-width="1.8"/>
+<rect x="703.7" y="1088.5" width="116.1" height="28.7" rx="4" fill="#7c3aed" fill-opacity="0.07" stroke="#7c3aed" stroke-width="1.8"/>
+<rect x="823.8" y="1088.5" width="136.6" height="28.7" rx="4" fill="#0891b2" fill-opacity="0.07" stroke="#0891b2" stroke-width="1.8"/>
+<rect x="787.5" y="1153.5" width="89.0" height="24.8" rx="4" fill="#b45309" fill-opacity="0.07" stroke="#b45309" stroke-width="1.8"/>
+<rect x="711.4" y="1183.5" width="241.2" height="24.8" rx="4" fill="#ea580c" fill-opacity="0.07" stroke="#ea580c" stroke-width="1.8"/>
+<rect x="802.5" y="1091.5" width="14.2" height="22.7" rx="4" fill="#c026d3" fill-opacity="0.07" stroke="#c026d3" stroke-width="1.8"/>
+<circle cx="809.6" cy="1123.2" r="8" fill="#15803d"/>
+<path d="M806.0,1123.2 l2.6,2.8 l4.8,-5.4" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="793.4" y="1186.5" width="156.2" height="18.8" rx="4" fill="#e11d48" fill-opacity="0.07" stroke="#e11d48" stroke-width="1.8"/>
+<circle cx="871.5" cy="1214.4" r="8" fill="#15803d"/>
+<path d="M867.9,1214.4 l2.6,2.8 l4.8,-5.4" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="24" y="1280" width="1072" height="56" rx="12" fill="#ffffff" stroke="#e2e8f0"/>
+<text x="42.0" y="1308.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#1e293b" font-weight="700" text-anchor="start"></text>
+<text x="44.0" y="1313.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="13" fill="#1e293b" font-weight="400" text-anchor="start">A value whose container is not found, or which is not found among its container&#x27;s words, stays unmatched: looking for it anywhere else could only find a wrong place.</text>
 </svg>

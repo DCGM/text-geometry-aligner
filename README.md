@@ -601,20 +601,21 @@ the values printed inside them:
 --inside-path 'agents[a].affiliation=agents[a].description'
 ```
 
-![Alignment in levels: the heading, the author statement and the page number
-are aligned on the whole page; the designation and the title on the heading's
-words, the name and the description on the statement's words; the part number
-on the designation's words and the affiliation on the description's
-words](docs/inside-levels.svg)
+![Alignment in levels: the heading and the author statement are aligned on
+the whole page, the values inside them on their words; aligned on its own, the
+part number and the affiliation take the running head's words, aligned in
+levels they take the words in the heading and in the statement](docs/inside-levels.svg)
 
-Level 0 aligns the heading, the statement and the page number on the whole
-page; the statement matches approximately, as the OCR read `Univerzlty`.
-Level 1 aligns the designation and the title on the heading's words, and the
-name and the description on the statement's words, which read the
-statement's text, `Univerzity`. Level 2 aligns the part number on the
-designation's words and the affiliation on the description's words, where it
-matches exactly. Every value ends up with a box inside its container's box.
-`docs/inside_levels_figure.py` draws the figure.
+The page's running head, which no value holds, prints a `3` and `Univerzity
+Karlovy` before the chapter does. Aligned on its own, a short value takes the
+first place its text is printed, so the part number and the affiliation land
+in the running head. The heading and the statement are long and printed once,
+so level 0 finds them surely on the whole page. Level 1 aligns the
+designation and the title among the heading's words, the name and the
+description among the statement's, and level 2 the part number among the
+designation's words and the affiliation among the description's: the
+sections place the values printed inside them. The results drawn are the
+aligner's on this input; `docs/inside_levels_figure.py` draws the figure.
 
 Repeating a `VALUE` adds containers in order, and the first container whose
 text holds the value is its container, whether that one is found or not. A
