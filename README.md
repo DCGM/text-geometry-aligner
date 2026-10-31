@@ -571,12 +571,16 @@ handles a value printed inside another value's words: a part number in its
 designation (`3` of `Kapitola 3`), an affiliation in its person's
 description. In one group the two would compete for those words. A value
 under the `VALUE` pattern whose text is a substring of the text of a value
-under the `CONTAINER` pattern is left out of the alignment. Afterwards the
-values inside one container are aligned as the page's values are, with the
-same candidate generator, selector and word groups, on a page of the words the
-container matched. A value whose text is not in a container's text is
-aligned as any other, and one whose container is not found stays unmatched. A
-name such as `[i]` must bind the same index in both patterns:
+under the `CONTAINER` pattern is aligned one level below it. The alignment
+works in levels: the first is the values inside no other value, on the whole
+page; below a matched value come the values inside it, on a page of the words
+it matched. Every level is aligned alike, with the same candidate generator,
+selector and word groups (the patterns are full JSON paths, so they apply on
+any level). A value whose text is not in a container's text is aligned as any
+other. One whose container is not found, or which is not found among its
+container's words, stays unmatched: the rule says where its text was taken
+from, and looking for it anywhere else could only find a wrong match. A name
+such as `[i]` must bind the same index in both patterns:
 
 ```text
 --inside-path 'entries[i].partNumber=entries[i].designation'
@@ -584,12 +588,11 @@ name such as `[i]` must bind the same index in both patterns:
 --inside-path 'entries[i].agents[*]=entries[i].subTitle'
 ```
 
-Repeating a `VALUE` adds containers in order, and the value takes its words in
-the first container that holds it and has a match of its own; a value not
-found there tries the next one. A container may itself be inside another
-value (`B=A` and `C=B`): it is located first and its own inside values are
-then aligned on its words, to any depth; values whose rules make each other
-their containers stay unmatched. A region located this way names its
+Repeating a `VALUE` adds containers in order, and the first container whose
+text holds the value is its container, whether that one is found or not. A
+container may itself be inside another value (`B=A` and `C=B`), so levels
+nest to any depth; values whose rules make each other their containers are
+reached from no level and stay unmatched. A region located this way names its
 container in `alignment_located_in`. Values located inside run before the
 copying of identical values, so a located value can be copied.
 

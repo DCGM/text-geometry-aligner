@@ -34,6 +34,7 @@ from text_geometry_aligner.models import (
     AlignmentRegion,
     AlignmentWord,
     InputFormat,
+    JSONPath,
     OutputGeometryFormat,
     OutputGeometrySource,
     OutputTextSource,
@@ -79,7 +80,7 @@ from text_geometry_aligner.text_matching.inside_values import (
     INSIDE_LOCATIONS,
     INSIDE_MATCHES,
     container_page,
-    inside_containers,
+    inside_parents,
     on_page,
     parse_inside_rules,
 )
@@ -369,29 +370,31 @@ class TextAligner(BaseAligner):
                 else self.normalizer.normalize(str(region.input_text))
             )
 
-        # A value printed inside another one is located within its words
-        # afterwards (inside_paths).
-        inside = inside_containers(
+        # A value printed inside another one is aligned on its words, one
+        # level below it (inside_paths); the page is the first level.
+        parents = inside_parents(
             page.regions, self.inside_paths, self.inside_match
         )
-        aligned_regions = [
-            region
-            for region in page.regions
-            if region.region_id not in inside
-        ]
+        children: dict[int | None, list[AlignmentRegion]] = {}
+        for region in page.regions:
+            parent = parents.get(region.region_id)
+            children.setdefault(
+                None if parent is None else parent.region_id, []
+            ).append(region)
         alto_index = ALTOTextIndex(alto_page, self.normalizer)
+        selected_by_region: dict[int, AlignmentCandidate] = {}
+        located_in: dict[int, JSONPath] = {}
         (
             candidates,
-            selected_candidates,
             ambiguous_region_ids,
             conflicted_region_ids,
-        ) = self._select(aligned_regions, alto_page, alto_index)
-        selected_by_region = {
-            candidate.region_id: candidate
-            for candidate in selected_candidates
-        }
-        located_in = self._align_inside(
-            page.regions, inside, selected_by_region, alto_page, alto_index
+        ) = self._align_level(
+            children,
+            None,
+            alto_page,
+            alto_index,
+            selected_by_region,
+            located_in,
         )
         copied_from = {}
         if self.copy_identical_paths:
@@ -552,74 +555,66 @@ class TextAligner(BaseAligner):
             conflicted_region_ids,
         )
 
-    def _align_inside(
+    def _align_level(
         self,
-        regions: Sequence[AlignmentRegion],
-        inside: Mapping[int, Sequence[AlignmentRegion]],
-        selected_by_region: dict[int, AlignmentCandidate],
+        children: Mapping[int | None, Sequence[AlignmentRegion]],
+        container: AlignmentRegion | None,
         alto_page: ALTOPage,
         alto_index: ALTOTextIndex,
-    ) -> dict[int, JSONPath]:
-        """Align the values printed inside others on their containers' words.
+        selected_by_region: dict[int, AlignmentCandidate],
+        located_in: dict[int, JSONPath],
+    ) -> tuple[tuple[AlignmentCandidate, ...], list[int], list[int]]:
+        """Align the values of one level, then those inside each of them.
 
-        The values of one container are aligned together as the page's
-        values are, on a page of the container's words (container_page). A
-        value takes its first container that has a match of its own; one not
-        found there tries its next container. A container that is itself
-        inside another is waited for until it is located, so values nest to
-        any depth; values left waiting on each other stay unmatched. Fills
-        `selected_by_region` and returns the container of each located value.
+        The first level (`container` None) is the values inside no other one,
+        on the whole page. A deeper one is the values inside `container`, on a
+        page of the words it matched (container_page). Every level is aligned
+        alike (_select). A value whose container is not matched, or which is
+        not found among its words, stays unmatched; values inside each other
+        are reached from no level and stay unmatched too. Fills
+        `selected_by_region` and `located_in`, and returns the level's
+        candidates and the ids of its ambiguous and conflicted regions.
         """
 
-        regions_by_id = {region.region_id: region for region in regions}
-        pending = {
-            region_id: list(containers)
-            for region_id, containers in inside.items()
-        }
-        located_in: dict[int, JSONPath] = {}
-        while True:
-            # A container neither matched nor waiting to be located will not
-            # be found; dropping one can leave another value without any.
-            dropped = True
-            while dropped:
-                dropped = False
-                for region_id, containers in list(pending.items()):
-                    while (
-                        containers
-                        and containers[0].region_id not in selected_by_region
-                        and containers[0].region_id not in pending
-                    ):
-                        containers.pop(0)
-                    if not containers:
-                        del pending[region_id]
-                        dropped = True
-            by_container: dict[int, list[AlignmentRegion]] = {}
-            for region_id, containers in pending.items():
-                if containers[0].region_id in selected_by_region:
-                    by_container.setdefault(
-                        containers[0].region_id, []
-                    ).append(regions_by_id[region_id])
-            if not by_container:
-                break
-            for container_id, values in by_container.items():
-                container = regions_by_id[container_id]
-                span = selected_by_region[container_id]
-                # The words come from the prepared page, in its order.
-                sub_page = container_page(
-                    container, span, alto_page, alto_index, self.inside_location
+        regions = children.get(
+            None if container is None else container.region_id, ()
+        )
+        span = (
+            None if container is None else selected_by_region[container.region_id]
+        )
+        if span is None:
+            level_page, level_index = alto_page, alto_index
+        else:
+            # The words come from the prepared page, in its order.
+            level_page = container_page(
+                container, span, alto_page, alto_index, self.inside_location
+            )
+            level_index = ALTOTextIndex(level_page, self.normalizer)
+        candidates, selected, ambiguous, conflicted = self._select(
+            regions, level_page, level_index
+        )
+        for candidate in selected:
+            if span is None:
+                selected_by_region[candidate.region_id] = candidate
+            else:
+                selected_by_region[candidate.region_id] = on_page(
+                    candidate, span, alto_index
                 )
-                sub_index = ALTOTextIndex(sub_page, self.normalizer)
-                _, selected, _, _ = self._select(values, sub_page, sub_index)
-                for candidate in selected:
-                    selected_by_region[candidate.region_id] = on_page(
-                        candidate, span, alto_index
-                    )
-                    located_in[candidate.region_id] = container.json_text_path
-                    del pending[candidate.region_id]
-                for value in values:
-                    if value.region_id in pending:
-                        pending[value.region_id].pop(0)
-        return located_in
+                located_in[candidate.region_id] = container.json_text_path
+        for region in regions:
+            if (
+                region.region_id in selected_by_region
+                and children.get(region.region_id)
+            ):
+                self._align_level(
+                    children,
+                    region,
+                    alto_page,
+                    alto_index,
+                    selected_by_region,
+                    located_in,
+                )
+        return candidates, ambiguous, conflicted
 
     def _word_partitions(
         self,

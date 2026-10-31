@@ -39,28 +39,28 @@ def parse_inside_rules(inside_paths: Mapping[str, str | Sequence[str]]) -> tuple
     return tuple(rules)
 
 
-def inside_containers(
+def inside_parents(
     regions: Sequence[AlignmentRegion],
     rules: Sequence[InsideRule],
     match: str = "exact",
-) -> dict[int, list[AlignmentRegion]]:
-    """Per value printed inside another one, the values it may be inside, in order.
+) -> dict[int, AlignmentRegion]:
+    """Per value printed inside another one, the value it was taken out of.
 
     A word goes to one value only, so a value printed in another one's words
     - a part number in its designation ("3" of "Kapitola 3"), an affiliation
     in its person's description - would lose them to it, or take them from
     it. A value under a rule's pattern whose text is in the text of a value
     under one of the rule's container patterns (as `match` tells), with the
-    same bound indices, is left out of the alignment and located afterwards
-    on its container's words (container_page). The rule says a text was
-    taken out of another one, so by default it must be a substring of it as
-    given. The containers come in the order of their patterns, then of the
-    input; the first rule a value matches decides.
+    same bound indices, is aligned on that value's words only
+    (container_page), one level below it. The rule says a text was taken out
+    of another one, so by default it must be a substring of it as given.
+    The first container holding it, in the order of the patterns and then of
+    the input, is its parent; the first rule a value matches decides.
     """
 
     if match not in INSIDE_MATCHES:
         raise ValueError(f"inside match {match!r} is not one of {', '.join(INSIDE_MATCHES)}")
-    by_region: dict[int, list[AlignmentRegion]] = {}
+    parents: dict[int, AlignmentRegion] = {}
     for region in regions:
         if region.json_text_path is None or not _text(region, match):
             continue
@@ -68,20 +68,23 @@ def inside_containers(
             bound = value_pattern.match(region.json_text_path)
             if bound is None:
                 continue
-            containers = [
-                container
-                for container_pattern in container_patterns
-                for container in regions
-                if container is not region
-                and container.json_text_path is not None
-                and _text(container, match)
-                and _agree(bound, container_pattern.match(container.json_text_path))
-                and _contains(_text(container, match), _text(region, match), match)
-            ]
-            if containers:
-                by_region[region.region_id] = containers
+            parent = next(
+                (
+                    container
+                    for container_pattern in container_patterns
+                    for container in regions
+                    if container is not region
+                    and container.json_text_path is not None
+                    and _text(container, match)
+                    and _agree(bound, container_pattern.match(container.json_text_path))
+                    and _contains(_text(container, match), _text(region, match), match)
+                ),
+                None,
+            )
+            if parent is not None:
+                parents[region.region_id] = parent
             break
-    return by_region
+    return parents
 
 
 def container_page(

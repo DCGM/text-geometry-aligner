@@ -780,6 +780,22 @@ def test_values_inside_nest_to_any_depth(lowercase_normalizer, inside_location) 
     }
 
 
+def test_a_value_stays_unmatched_when_the_first_container_holding_it_is_not_found(
+    lowercase_normalizer,
+) -> None:
+    data = {"entries": [{"title": "Erben Kytice", "subTitle": "Erben", "agents": ["Erben"]}]}
+    aligner = _cp_sat_aligner(
+        lowercase_normalizer,
+        inside_paths={"entries[i].agents[*]": ["entries[i].title", "entries[i].subTitle"]},
+    )
+
+    regions = _regions_by_path(aligner.align_data(_page("Erben"), data))
+
+    assert regions["entries", 0, "title"].words is None
+    assert [word.word_index for word in regions["entries", 0, "subTitle"].words] == [0]
+    assert regions["entries", 0, "agents", 0].words is None
+
+
 def test_values_inside_each_other_stay_unmatched(lowercase_normalizer) -> None:
     data = {"A": "a b", "B": "a b", "C": "x"}
     aligner = _cp_sat_aligner(lowercase_normalizer, inside_paths={"A": "B", "B": "A"})
