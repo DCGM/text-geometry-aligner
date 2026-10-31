@@ -763,6 +763,52 @@ def test_a_value_whose_container_is_not_found_stays_unmatched(
     assert entry["partNumber_bbox"] is None
 
 
+@pytest.mark.parametrize(
+    ("inside_match", "located_in", "x"),
+    [
+        ("exact", None, 20),
+        ("normalized", ("agents", 0, "description", 0), 10),
+    ],
+)
+def test_a_value_is_inside_its_container_by_default_only_as_a_substring_of_its_input_text(
+    lowercase_normalizer, alignment_output, inside_match, located_in, x
+) -> None:
+    data = {"agents": [{"description": ["Profesor, Praha"], "affiliation": ["praha"]}]}
+    page = _page("Profesor,", "Praha", "praha")
+    options = {} if inside_match == "exact" else {"inside_match": inside_match}
+    aligner = _cp_sat_aligner(
+        lowercase_normalizer, inside_paths={"agents[i].affiliation[*]": "agents[i].description[*]"}, **options)
+
+    document = aligner.align_data(page, data)
+
+    assert alignment_output(aligner, document)["agents"][0]["affiliation_bbox"][0]["x"] == x
+    assert _regions_by_path(document)["agents", 0, "affiliation", 0].alignment_located_in == located_in
+
+
+def test_a_value_inside_by_words_is_not_part_of_a_word_of_its_container(
+    lowercase_normalizer, alignment_output
+) -> None:
+    data = {"entries": [{"designation": "Kapitola 13", "partNumber": "3"}]}
+    page = _page("Kapitola", "13", "3")
+    aligner = _cp_sat_aligner(
+        lowercase_normalizer, inside_paths={"entries[i].partNumber": "entries[i].designation"},
+        inside_match="words")
+
+    document = aligner.align_data(page, data)
+
+    assert alignment_output(aligner, document)["entries"][0]["partNumber_bbox"]["x"] == 20
+    assert _regions_by_path(document)["entries", 0, "partNumber"].alignment_located_in is None
+
+
+def test_inside_match_must_be_known() -> None:
+    with pytest.raises(ValueError, match="inside_match"):
+        alignment.TextAligner(
+            candidate_generator=alignment.ExactTextCandidateGenerator(),
+            candidate_selector=alignment.PassThroughCandidateSelector(),
+            inside_match="fuzzy",
+        )
+
+
 def test_inside_paths_need_a_container() -> None:
     with pytest.raises(ValueError, match="names no container"):
         alignment.TextAligner(
@@ -1079,5 +1125,7 @@ def test_inside_path_cli_option_gives_the_containers_of_a_value_in_order() -> No
 
     assert aligner_module._inside_paths(args.inside_path) == {
         "entries[i].agents[*]": ["entries[i].title", "entries[i].subTitle"]}
+    assert args.inside_match == "exact"
+    assert parser.parse_args([*required_arguments, "--inside-match", "words"]).inside_match == "words"
     with pytest.raises(ValueError, match="VALUE=CONTAINER"):
         aligner_module._inside_paths(["entries[i].partNumber"])

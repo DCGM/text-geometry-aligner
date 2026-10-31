@@ -76,6 +76,7 @@ from text_geometry_aligner.text_matching.identical_copies import (
     copy_identical_matches,
 )
 from text_geometry_aligner.text_matching.inside_values import (
+    INSIDE_MATCHES,
     inside_containers,
     locate_inside,
     parse_inside_rules,
@@ -124,6 +125,7 @@ class TextAligner(BaseAligner):
         copy_identical_paths: Sequence[str] = (),
         word_group_paths: Sequence[str] = (),
         inside_paths: Mapping[str, str | Sequence[str]] | None = None,
+        inside_match: str = "exact",
     ):
         if geometry_suffix == "":
             raise ValueError("geometry_suffix must not be empty")
@@ -139,6 +141,10 @@ class TextAligner(BaseAligner):
             )
         if not 0.0 <= min_similarity <= 1.0:
             raise ValueError("min_similarity must be within [0, 1]")
+        if inside_match not in INSIDE_MATCHES:
+            raise ValueError(
+                f"inside_match must be one of {', '.join(INSIDE_MATCHES)}"
+            )
         if share_words_depth is not None and share_words_depth < 1:
             raise ValueError("share_words_depth must be at least 1")
         if (
@@ -211,6 +217,7 @@ class TextAligner(BaseAligner):
         )
         self.word_group_paths = parsed_word_group_paths
         self.inside_paths = parse_inside_rules(inside_paths or {})
+        self.inside_match = inside_match
         self.prefer_sibling_proximity = prefer_sibling_proximity
         self.json_reader = json_reader or JSONTextReader(
             geometry_suffix=self.geometry_suffix,
@@ -356,7 +363,9 @@ class TextAligner(BaseAligner):
 
         # A value printed inside another one is located within its words
         # afterwards (inside_paths).
-        inside = inside_containers(page.regions, self.inside_paths)
+        inside = inside_containers(
+            page.regions, self.inside_paths, self.inside_match
+        )
         aligned_regions = [
             region
             for region in page.regions
@@ -750,9 +759,18 @@ def build_argument_parser() -> argparse.ArgumentParser:
         metavar="VALUE=CONTAINER",
         help="JSON path patterns of a value and of the value it may be printed "
         "inside (entries[i].partNumber=entries[i].designation): when its text "
-        "is words of the container's text it is located within the "
+        "is in the container's text (--inside-match) it is located within the "
         "container's words after the alignment; repeat for more, and with the "
         "same VALUE for more containers in order",
+    )
+    parser.add_argument(
+        "--inside-match",
+        choices=INSIDE_MATCHES,
+        default="exact",
+        help="how a --inside-path value's text must be in its container's "
+        "text: a substring of the input text as given (exact, default), a "
+        "substring of the normalized text (normalized), or whole consecutive "
+        "words of the normalized text, punctuation aside (words)",
     )
     parser.add_argument(
         "--copy-identical-path",
@@ -895,6 +913,7 @@ def main() -> None:
         copy_identical_paths=args.copy_identical_path or (),
         word_group_paths=args.word_group_path or (),
         inside_paths=_inside_paths(args.inside_path or ()),
+        inside_match=args.inside_match,
         prefer_sibling_proximity=args.prefer_sibling_proximity,
     )
     aligner.process_directories(
