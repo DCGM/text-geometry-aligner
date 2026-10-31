@@ -444,6 +444,7 @@ Important options:
 | `--min-similarity` | `0` | Discard candidates below this similarity |
 | `--share-words-between-top-level-keys` | off | Let values under different top-level keys match the same ALTO words (`--share-words-depth 1`) |
 | `--share-words-depth` | none | Values compete for ALTO words only when their JSON paths agree on this many first components |
+| `--inside-path` | none | `VALUE=CONTAINER` path patterns: a value whose text is words of its container's text is located within the container's words; repeat for more |
 | `--copy-identical-path` | none | JSON path pattern whose unmatched values take the match of an identical, exactly matched value under it; repeat for more |
 | `--share-words-key` | none | Values under this key, at any depth, form their own group and may match other values' words; repeat for more keys |
 | `--word-group-path` | none | JSON path pattern whose values compete for words only with each other; deeper patterns nest, uncovered values form one more group; replaces the two options above; repeat for more |
@@ -562,6 +563,29 @@ approximately keeps its match, as the text may be printed twice and misread
 once; when the identical values match different words, nothing is copied. A
 copied region names its source in `alignment_copied_from`; the JSON output
 does not tell copies apart.
+
+`--inside-path VALUE=CONTAINER` (`inside_paths={VALUE: CONTAINER}` in Python)
+handles a value printed inside another value's words: a part number in its
+designation (`3` of `Kapitola 3`), an affiliation in its person's
+description. In one group the two would compete for those words. A value
+under the `VALUE` pattern whose text is whole consecutive words of the text
+of a value under the `CONTAINER` pattern, punctuation aside, is left out of
+the alignment. Afterwards it is looked for, with the same candidate
+generator, among the words its container matched, so a word the OCR misread
+is found as in the alignment. A value whose text is not in a container's text
+is aligned as any other, and one whose container is not found stays
+unmatched. A name such as `[i]` must bind the same index in both patterns:
+
+```text
+--inside-path 'entries[i].partNumber=entries[i].designation'
+--inside-path 'entries[i].agents[*]=entries[i].title'
+--inside-path 'entries[i].agents[*]=entries[i].subTitle'
+```
+
+Repeating a `VALUE` adds containers in order, and the value takes its words in
+the first container that holds it. A region located this way names its
+container in `alignment_located_in`. Values located inside run before the
+copying of identical values, so a located value can be copied.
 
 The earliest-position tie-break picks the first occurrence of a value printed
 more than once, such as a place or a year. `--prefer-sibling-proximity` moves

@@ -193,6 +193,8 @@ class AlignmentRegion:
     alignment_score: float | None = None
     # The path of the value whose match this one took (copy_identical_paths).
     alignment_copied_from: JSONPath | None = None
+    # The path of the value whose words this one was located in (inside_paths).
+    alignment_located_in: JSONPath | None = None
     # The page of the region's first word when several pages are aligned at
     # once (TextAligner.align_pages); its geometry covers its words there.
     page_index: int | None = None

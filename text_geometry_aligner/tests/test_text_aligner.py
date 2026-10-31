@@ -656,6 +656,122 @@ def test_word_group_paths_are_not_combined_with_share_options(options) -> None:
         )
 
 
+def _regions_by_path(document) -> dict:
+    return {region.json_text_path: region for region in document.pages[0].regions}
+
+
+def test_a_value_printed_inside_another_is_located_within_its_words(
+    lowercase_normalizer, alignment_output
+) -> None:
+    data = {"entries": [{"designation": "Kapitola 3", "partNumber": "3"}]}
+    page = _page("Kapitola", "3")
+
+    exclusive = _cp_sat_aligner(lowercase_normalizer)
+    inside = _cp_sat_aligner(
+        lowercase_normalizer, inside_paths={"entries[i].partNumber": "entries[i].designation"})
+    exclusive_entry = alignment_output(exclusive, exclusive.align_data(page, data))["entries"][0]
+    document = inside.align_data(page, data)
+    entry = alignment_output(inside, document)["entries"][0]
+
+    assert (exclusive_entry["designation_bbox"] is None) != (exclusive_entry["partNumber_bbox"] is None)
+    assert entry["designation_bbox"] == {"x": 0, "y": 0, "width": 19, "height": 10}
+    assert entry["partNumber_bbox"] == {"x": 10, "y": 0, "width": 9, "height": 10}
+    assert _regions_by_path(document)["entries", 0, "partNumber"].alignment_located_in == (
+        "entries", 0, "designation")
+
+
+def test_a_value_not_printed_inside_its_container_is_aligned_on_its_own(
+    lowercase_normalizer, alignment_output
+) -> None:
+    data = {"agents": [{"description": ["profesor v Brne"], "affiliation": ["Praha"]}]}
+    page = _page("profesor", "v", "Brne", "Praha")
+    aligner = _cp_sat_aligner(
+        lowercase_normalizer, inside_paths={"agents[i].affiliation[*]": "agents[i].description[*]"})
+
+    document = aligner.align_data(page, data)
+
+    assert alignment_output(aligner, document)["agents"][0]["affiliation_bbox"][0]["x"] == 30
+    assert _regions_by_path(document)["agents", 0, "affiliation", 0].alignment_located_in is None
+
+
+def test_a_value_inside_its_container_finds_a_word_the_ocr_misread(
+    lowercase_normalizer, alignment_output
+) -> None:
+    data = {"agents": [{"description": ["profesor Komenskeho university"],
+                        "affiliation": ["Komenskeho university"]}]}
+    page = _page("profesor", "Komenskcho", "university")
+    aligner = alignment.TextAligner(
+        candidate_generator=alignment.CompositeCandidateGenerator((
+            alignment.ExactTextCandidateGenerator(),
+            alignment.AnchoredFuzzyTextCandidateGenerator(alignment.FuzzyCandidateConfig()),
+        )),
+        candidate_selector=alignment.CPSATCandidateSelector(),
+        normalizer=lowercase_normalizer,
+        inside_paths={"agents[i].affiliation[*]": "agents[i].description[*]"},
+    )
+
+    agent = alignment_output(aligner, aligner.align_data(page, data))["agents"][0]
+
+    assert agent["description_bbox"][0]["x"] == 0
+    assert agent["affiliation_bbox"][0] == {"x": 10, "y": 0, "width": 19, "height": 10}
+
+
+def test_a_value_is_located_in_the_first_of_its_containers_that_holds_it(
+    lowercase_normalizer, alignment_output
+) -> None:
+    data = {"entries": [{"title": "Kytice", "subTitle": "Erbenova sbirka", "agents": ["Erbenova"]}]}
+    page = _page("Kytice", "Erbenova", "sbirka")
+    aligner = _cp_sat_aligner(
+        lowercase_normalizer,
+        inside_paths={"entries[i].agents[*]": ["entries[i].title", "entries[i].subTitle"]},
+    )
+
+    document = aligner.align_data(page, data)
+
+    entry = alignment_output(aligner, document)["entries"][0]
+    assert entry["subTitle_bbox"]["x"] == 10
+    assert entry["agents_bbox"][0]["x"] == 10
+    assert _regions_by_path(document)["entries", 0, "agents", 0].alignment_located_in == (
+        "entries", 0, "subTitle")
+
+
+def test_a_value_inside_a_container_of_another_element_is_aligned_on_its_own(
+    lowercase_normalizer,
+) -> None:
+    data = {"entries": [{"designation": "Kapitola 3"}, {"designation": "Kapitola 4", "partNumber": "3"}]}
+    page = _page("Kapitola", "3", "Kapitola", "4", "3")
+    aligner = _cp_sat_aligner(
+        lowercase_normalizer, inside_paths={"entries[i].partNumber": "entries[i].designation"})
+
+    region = _regions_by_path(aligner.align_data(page, data))["entries", 1, "partNumber"]
+
+    assert region.alignment_located_in is None
+    assert [word.word_index for word in region.words] == [4]
+
+
+def test_a_value_whose_container_is_not_found_stays_unmatched(
+    lowercase_normalizer, alignment_output
+) -> None:
+    data = {"entries": [{"designation": "Oddil 3", "partNumber": "3"}]}
+    page = _page("Kapitola", "3")
+    aligner = _cp_sat_aligner(
+        lowercase_normalizer, inside_paths={"entries[i].partNumber": "entries[i].designation"})
+
+    entry = alignment_output(aligner, aligner.align_data(page, data))["entries"][0]
+
+    assert entry["designation_bbox"] is None
+    assert entry["partNumber_bbox"] is None
+
+
+def test_inside_paths_need_a_container() -> None:
+    with pytest.raises(ValueError, match="names no container"):
+        alignment.TextAligner(
+            candidate_generator=alignment.ExactTextCandidateGenerator(),
+            candidate_selector=alignment.PassThroughCandidateSelector(),
+            inside_paths={"entries[i].partNumber": []},
+        )
+
+
 def test_a_value_printed_once_for_several_takes_the_match_of_its_identical_value(
     lowercase_normalizer, alignment_output
 ) -> None:
@@ -951,3 +1067,17 @@ def test_word_group_path_cli_option() -> None:
 
     assert default_args.word_group_path is None
     assert args.word_group_path == ["titleInfo", "titleInfo[*].statement"]
+
+
+def test_inside_path_cli_option_gives_the_containers_of_a_value_in_order() -> None:
+    parser = aligner_module.build_argument_parser()
+    required_arguments = ["--alto-dir", "alto", "--input-dir", "json", "--json-output-dir", "output"]
+
+    args = parser.parse_args([*required_arguments,
+                              "--inside-path", "entries[i].agents[*]=entries[i].title",
+                              "--inside-path", "entries[i].agents[*]=entries[i].subTitle"])
+
+    assert aligner_module._inside_paths(args.inside_path) == {
+        "entries[i].agents[*]": ["entries[i].title", "entries[i].subTitle"]}
+    with pytest.raises(ValueError, match="VALUE=CONTAINER"):
+        aligner_module._inside_paths(["entries[i].partNumber"])

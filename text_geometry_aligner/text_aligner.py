@@ -7,7 +7,7 @@ import argparse
 import dataclasses
 import logging
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any, Mapping, Sequence
 
 import text_geometry_aligner.base_aligner as base_aligner_module
 from text_geometry_aligner.io_alto import ALTOPage, ALTOReader, ALTOWord
@@ -75,6 +75,11 @@ from text_geometry_aligner.text_matching.diagnostics import (
 from text_geometry_aligner.text_matching.identical_copies import (
     copy_identical_matches,
 )
+from text_geometry_aligner.text_matching.inside_values import (
+    inside_containers,
+    locate_inside,
+    parse_inside_rules,
+)
 from text_geometry_aligner.text_matching.path_pattern import JSONPathPattern
 from text_geometry_aligner.text_matching.sibling_proximity import (
     refine_by_sibling_proximity,
@@ -118,6 +123,7 @@ class TextAligner(BaseAligner):
         share_words_keys: Sequence[str] = (),
         copy_identical_paths: Sequence[str] = (),
         word_group_paths: Sequence[str] = (),
+        inside_paths: Mapping[str, str | Sequence[str]] | None = None,
     ):
         if geometry_suffix == "":
             raise ValueError("geometry_suffix must not be empty")
@@ -204,6 +210,7 @@ class TextAligner(BaseAligner):
             JSONPathPattern.parse(pattern) for pattern in copy_identical_paths
         )
         self.word_group_paths = parsed_word_group_paths
+        self.inside_paths = parse_inside_rules(inside_paths or {})
         self.prefer_sibling_proximity = prefer_sibling_proximity
         self.json_reader = json_reader or JSONTextReader(
             geometry_suffix=self.geometry_suffix,
@@ -347,17 +354,23 @@ class TextAligner(BaseAligner):
                 else self.normalizer.normalize(str(region.input_text))
             )
 
+        # A value printed inside another one is located within its words
+        # afterwards (inside_paths).
+        inside = inside_containers(page.regions, self.inside_paths)
+        aligned_regions = [
+            region
+            for region in page.regions
+            if region.region_id not in inside
+        ]
         alto_index = ALTOTextIndex(alto_page, self.normalizer)
         candidates = self.candidate_generator.generate(
-            page.regions,
+            aligned_regions,
             alto_index,
         )
+        # A short value within the edit-distance limit can still be a
+        # different word ("I" -> "IV."); such candidates never compete.
+        minimum_similarity_int = round(self.min_similarity * SIMILARITY_SCALE)
         if self.min_similarity > 0.0:
-            # A short value within the edit-distance limit can still be a
-            # different word ("I" -> "IV."); such candidates never compete.
-            minimum_similarity_int = round(
-                self.min_similarity * SIMILARITY_SCALE
-            )
             candidates = tuple(
                 candidate
                 for candidate in candidates
@@ -367,7 +380,7 @@ class TextAligner(BaseAligner):
         selected_candidates: list[AlignmentCandidate] = []
         conflicted_region_ids: list[int] = []
         for partition_regions, partition_candidates in self._word_partitions(
-            page.regions,
+            aligned_regions,
             candidates,
         ):
             partition_selected = self.candidate_selector.select(
@@ -392,6 +405,22 @@ class TextAligner(BaseAligner):
             candidate.region_id: candidate
             for candidate in selected_candidates
         }
+        located_in = {}
+        regions_by_id = {region.region_id: region for region in page.regions}
+        for region_id, containers in inside.items():
+            found = locate_inside(
+                regions_by_id[region_id],
+                containers,
+                selected_by_region,
+                alto_page,
+                alto_index,
+                self.candidate_generator,
+                self.normalizer,
+                minimum_similarity_int,
+            )
+            if found is not None:
+                selected_by_region[region_id] = found[0]
+                located_in[region_id] = found[1].json_text_path
         copied_from = {}
         if self.copy_identical_paths:
             for region_id, donor in copy_identical_matches(
@@ -417,6 +446,7 @@ class TextAligner(BaseAligner):
 
             region.text_alignment_candidate = candidate
             region.alignment_copied_from = copied_from.get(region.region_id)
+            region.alignment_located_in = located_in.get(region.region_id)
             region.alto_text_normalized = (
                 alto_index.normalized_text_for_word_interval(
                     candidate.start_word,
@@ -473,6 +503,12 @@ class TextAligner(BaseAligner):
                 else ", copied from "
                 + _format_json_path(region.alignment_copied_from),
             )
+            if region.alignment_located_in is not None:
+                logger.info(
+                    "Located %s inside %s",
+                    _format_json_path(region.json_text_path or ()),
+                    _format_json_path(region.alignment_located_in),
+                )
 
         logger.info(
             "Page alignment summary: regions=%d candidates=%d matched=%d "
@@ -565,6 +601,18 @@ def _word_group(patterns: Sequence[JSONPathPattern], path: tuple) -> Any:
         return ()
     pattern, bound = deepest
     return ("word-group", pattern.text, bound)
+
+
+def _inside_paths(arguments: Sequence[str]) -> dict[str, list[str]]:
+    """VALUE=CONTAINER arguments as inside_paths, the containers of a value in order."""
+
+    paths: dict[str, list[str]] = {}
+    for argument in arguments:
+        value, separator, container = argument.partition("=")
+        if not separator or not value or not container:
+            raise ValueError(f"--inside-path {argument!r} is not VALUE=CONTAINER")
+        paths.setdefault(value, []).append(container)
+    return paths
 
 
 def build_argument_parser() -> argparse.ArgumentParser:
@@ -694,6 +742,17 @@ def build_argument_parser() -> argparse.ArgumentParser:
         "makes a group of its own inside it, values no pattern covers form one "
         "more group; replaces --share-words-depth and --share-words-key; "
         "repeat for more patterns",
+    )
+    parser.add_argument(
+        "--inside-path",
+        action="append",
+        default=None,
+        metavar="VALUE=CONTAINER",
+        help="JSON path patterns of a value and of the value it may be printed "
+        "inside (entries[i].partNumber=entries[i].designation): when its text "
+        "is words of the container's text it is located within the "
+        "container's words after the alignment; repeat for more, and with the "
+        "same VALUE for more containers in order",
     )
     parser.add_argument(
         "--copy-identical-path",
@@ -835,6 +894,7 @@ def main() -> None:
         share_words_keys=args.share_words_key or (),
         copy_identical_paths=args.copy_identical_path or (),
         word_group_paths=args.word_group_path or (),
+        inside_paths=_inside_paths(args.inside_path or ()),
         prefer_sibling_proximity=args.prefer_sibling_proximity,
     )
     aligner.process_directories(
