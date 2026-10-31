@@ -446,6 +446,7 @@ Important options:
 | `--share-words-depth` | none | Values compete for ALTO words only when their JSON paths agree on this many first components |
 | `--copy-identical-path` | none | JSON path pattern whose unmatched values take the match of an identical, exactly matched value under it; repeat for more |
 | `--share-words-key` | none | Values under this key, at any depth, form their own group and may match other values' words; repeat for more keys |
+| `--word-group-path` | none | JSON path pattern whose values compete for words only with each other; deeper patterns nest, uncovered values form one more group; replaces the two options above; repeat for more |
 | `--prefer-sibling-proximity` | off | Among equally good matches take the one nearest to the value's siblings |
 
 Available optional text normalizers are `lowercase`, `strip-diacritics`, and
@@ -529,6 +530,24 @@ of their own within their partition. It is meant for a whole statement stored
 next to the fields that split it, such as a `citation` of a reviewed book
 beside the book's title, persons and imprint: both the statement and its parts
 get geometry. Values under the same share key still compete with each other.
+
+`--word-group-path PATTERN` names the groups directly and replaces
+`--share-words-depth` and `--share-words-key`. The values under a pattern
+compete only with each other, so values of different groups may match the
+same words. Patterns nest: the values under a deeper pattern leave the
+group of the pattern around it for a group of their own, so
+
+```text
+--word-group-path titleInfo --word-group-path 'titleInfo[*].statementOfResponsibility'
+```
+
+lets the statement of responsibility share words with the title, while the
+title and the subtitle still compete. Values no pattern covers form one more
+group, and with no pattern every value is in it, as by default. `[*]` puts all
+list elements into one group and a name such as `[i]` makes each element its
+own group: `entries[i]` is `--share-words-depth 2` for `{"entries": [...]}`.
+Two patterns that match the same values at the same depth (`agents[*]` and
+`agents[0]`) are rejected, so the order of the patterns does not matter.
 
 `--copy-identical-path PATTERN` handles a text the input repeats on purpose
 within one group: a description printed once under several names, one person

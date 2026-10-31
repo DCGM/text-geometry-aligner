@@ -562,6 +562,100 @@ def test_share_key_lets_a_whole_statement_share_words_with_its_parts(
     assert shared_output["works"][0]["title_bbox"]["x"] == 20
 
 
+def test_values_no_word_group_path_covers_compete_in_one_group(
+    lowercase_normalizer, alignment_output
+) -> None:
+    data = {"publisher": "Otto", "printer": "Otto", "title": "Kniha"}
+    page = _page("Otto", "Kniha")
+
+    sink = _cp_sat_aligner(lowercase_normalizer, word_group_paths=["title"])
+    grouped = _cp_sat_aligner(lowercase_normalizer, word_group_paths=["publisher"])
+    sink_output = alignment_output(sink, sink.align_data(page, data))
+    grouped_output = alignment_output(grouped, grouped.align_data(page, data))
+
+    assert (sink_output["publisher_bbox"] is None) != (sink_output["printer_bbox"] is None)
+    assert grouped_output["publisher_bbox"]["x"] == grouped_output["printer_bbox"]["x"] == 0
+
+
+def test_a_deeper_word_group_path_takes_its_values_out_of_the_outer_group(
+    lowercase_normalizer, alignment_output
+) -> None:
+    data = {"work": {"citation": "Jan Novak Kniha", "title": "Kniha", "subTitle": "Kniha"}}
+    page = _page("Jan", "Novak", "Kniha")
+    aligner = _cp_sat_aligner(lowercase_normalizer, word_group_paths=["work", "work.citation"])
+
+    work = alignment_output(aligner, aligner.align_data(page, data))["work"]
+
+    assert work["citation_bbox"]["x"] == 0
+    # The title and the subtitle stay in the outer group and still compete.
+    assert (work["title_bbox"] is None) != (work["subTitle_bbox"] is None)
+
+
+def test_a_word_group_path_with_a_named_index_makes_each_element_its_own_group(
+    lowercase_normalizer, alignment_output
+) -> None:
+    data = {
+        "items": [
+            {"section": "Recenze", "title": "Prvni"},
+            {"section": "Recenze", "title": "Druha"},
+        ]
+    }
+    page = _page("Recenze", "Prvni", "Druha")
+
+    together = _cp_sat_aligner(lowercase_normalizer, word_group_paths=["items[*]"])
+    apart = _cp_sat_aligner(lowercase_normalizer, word_group_paths=["items[i]"])
+    together_output = alignment_output(together, together.align_data(page, data))
+    apart_output = alignment_output(apart, apart.align_data(page, data))
+
+    assert sum(item["section_bbox"] is not None for item in together_output["items"]) == 1
+    assert [item["section_bbox"]["x"] for item in apart_output["items"]] == [0, 0]
+
+
+@pytest.mark.parametrize(
+    "patterns",
+    [["agents[*]", "agents[0]"], ["agents[i]", "agents[*]"], ["title", "$title"]],
+)
+def test_word_group_paths_matching_the_same_values_at_the_same_depth_are_rejected(patterns) -> None:
+    with pytest.raises(ValueError, match="same depth"):
+        alignment.TextAligner(
+            candidate_generator=alignment.ExactTextCandidateGenerator(),
+            candidate_selector=alignment.PassThroughCandidateSelector(),
+            word_group_paths=patterns,
+        )
+
+
+@pytest.mark.parametrize(
+    "patterns",
+    [["agents[0]", "agents[1]"], ["agents", "agents[*]", "agents[*].name"], ["agents[*].name", "series[*].name"]],
+)
+def test_word_group_paths_at_different_depths_or_on_different_values_are_accepted(patterns) -> None:
+    aligner = alignment.TextAligner(
+        candidate_generator=alignment.ExactTextCandidateGenerator(),
+        candidate_selector=alignment.PassThroughCandidateSelector(),
+        word_group_paths=patterns,
+    )
+
+    assert [pattern.text for pattern in aligner.word_group_paths] == patterns
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        {"share_words_depth": 1},
+        {"share_words_between_top_level_keys": True},
+        {"share_words_keys": ["citation"]},
+    ],
+)
+def test_word_group_paths_are_not_combined_with_share_options(options) -> None:
+    with pytest.raises(ValueError, match="word_group_paths"):
+        alignment.TextAligner(
+            candidate_generator=alignment.ExactTextCandidateGenerator(),
+            candidate_selector=alignment.PassThroughCandidateSelector(),
+            word_group_paths=["agents"],
+            **options,
+        )
+
+
 def test_a_value_printed_once_for_several_takes_the_match_of_its_identical_value(
     lowercase_normalizer, alignment_output
 ) -> None:
@@ -845,3 +939,15 @@ def test_share_words_cli_options() -> None:
     assert default_args.share_words_key is None
     assert args.share_words_depth == 2
     assert args.share_words_key == ["citation", "statement"]
+
+
+def test_word_group_path_cli_option() -> None:
+    parser = aligner_module.build_argument_parser()
+    required_arguments = ["--alto-dir", "alto", "--input-dir", "json", "--json-output-dir", "output"]
+
+    default_args = parser.parse_args(required_arguments)
+    args = parser.parse_args([*required_arguments, "--word-group-path", "titleInfo",
+                              "--word-group-path", "titleInfo[*].statement"])
+
+    assert default_args.word_group_path is None
+    assert args.word_group_path == ["titleInfo", "titleInfo[*].statement"]

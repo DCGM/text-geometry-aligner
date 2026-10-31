@@ -73,9 +73,9 @@ from text_geometry_aligner.text_matching.diagnostics import (
     _find_conflicted_region_ids,
 )
 from text_geometry_aligner.text_matching.identical_copies import (
-    CopyPathPattern,
     copy_identical_matches,
 )
+from text_geometry_aligner.text_matching.path_pattern import JSONPathPattern
 from text_geometry_aligner.text_matching.sibling_proximity import (
     refine_by_sibling_proximity,
 )
@@ -117,6 +117,7 @@ class TextAligner(BaseAligner):
         share_words_depth: int | None = None,
         share_words_keys: Sequence[str] = (),
         copy_identical_paths: Sequence[str] = (),
+        word_group_paths: Sequence[str] = (),
     ):
         if geometry_suffix == "":
             raise ValueError("geometry_suffix must not be empty")
@@ -142,6 +143,25 @@ class TextAligner(BaseAligner):
                 "share_words_between_top_level_keys is share_words_depth=1; "
                 "do not combine it with another depth"
             )
+        parsed_word_group_paths = tuple(
+            JSONPathPattern.parse(pattern) for pattern in word_group_paths
+        )
+        if parsed_word_group_paths and (
+            share_words_between_top_level_keys
+            or share_words_depth is not None
+            or share_words_keys
+        ):
+            raise ValueError(
+                "word_group_paths replace share_words_depth and "
+                "share_words_keys; do not combine them"
+            )
+        for position, first in enumerate(parsed_word_group_paths):
+            for second in parsed_word_group_paths[position + 1:]:
+                if first.overlaps(second):
+                    raise ValueError(
+                        f"word_group_paths {first.text!r} and {second.text!r} "
+                        "match the same values at the same depth"
+                    )
         parsed_output_geometry_format = OutputGeometryFormat(
             output_geometry_format
         )
@@ -181,8 +201,9 @@ class TextAligner(BaseAligner):
         )
         self.share_words_keys = frozenset(share_words_keys)
         self.copy_identical_paths = tuple(
-            CopyPathPattern.parse(pattern) for pattern in copy_identical_paths
+            JSONPathPattern.parse(pattern) for pattern in copy_identical_paths
         )
+        self.word_group_paths = parsed_word_group_paths
         self.prefer_sibling_proximity = prefer_sibling_proximity
         self.json_reader = json_reader or JSONTextReader(
             geometry_suffix=self.geometry_suffix,
@@ -480,13 +501,25 @@ class TextAligner(BaseAligner):
         list element its own group. Regions under a share key (at any depth)
         form a group of their own within their partition, so a whole statement
         can share words with the values that split it.
+
+        Word group paths name the groups instead: the values under a pattern
+        form its group, those under a deeper pattern inside it a group of
+        their own, and the values no pattern covers one more group. Under
+        ``[*]`` all list elements are one group, under a name such as ``[i]``
+        each element is its own.
         """
 
-        if self.share_words_depth is None and not self.share_words_keys:
+        if (
+            self.share_words_depth is None
+            and not self.share_words_keys
+            and not self.word_group_paths
+        ):
             return [(list(regions), list(candidates))]
 
         def key(path: Any) -> Any:
             parts = tuple(path or ())
+            if self.word_group_paths:
+                return _word_group(self.word_group_paths, parts)
             depth = self.share_words_depth
             group = parts[:depth] if depth else ()
             shared = next(
@@ -516,6 +549,23 @@ class TextAligner(BaseAligner):
                 ([], []),
             )[1].append(candidate)
         return list(partitions.values())
+
+def _word_group(patterns: Sequence[JSONPathPattern], path: tuple) -> Any:
+    """The group of the deepest pattern over `path`; () when none is."""
+
+    deepest = None
+    for pattern in patterns:
+        bound = pattern.match(path, prefix=True)
+        if bound is not None and (
+            deepest is None
+            or len(pattern.components) > len(deepest[0].components)
+        ):
+            deepest = (pattern, bound)
+    if deepest is None:
+        return ()
+    pattern, bound = deepest
+    return ("word-group", pattern.text, bound)
+
 
 def build_argument_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -634,6 +684,16 @@ def build_argument_parser() -> argparse.ArgumentParser:
         default=None,
         help="JSON key whose values (nested ones too) form their own group, so "
         "they may match the words of the other values; repeat for more keys",
+    )
+    parser.add_argument(
+        "--word-group-path",
+        action="append",
+        default=None,
+        help="JSON path pattern (titleInfo, agents[*], entries[i]) whose "
+        "values compete for ALTO words only with each other; a deeper pattern "
+        "makes a group of its own inside it, values no pattern covers form one "
+        "more group; replaces --share-words-depth and --share-words-key; "
+        "repeat for more patterns",
     )
     parser.add_argument(
         "--copy-identical-path",
@@ -774,6 +834,7 @@ def main() -> None:
         share_words_depth=args.share_words_depth,
         share_words_keys=args.share_words_key or (),
         copy_identical_paths=args.copy_identical_path or (),
+        word_group_paths=args.word_group_path or (),
         prefer_sibling_proximity=args.prefer_sibling_proximity,
     )
     aligner.process_directories(
